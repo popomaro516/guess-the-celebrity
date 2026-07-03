@@ -1,0 +1,15 @@
+services:
+  api:
+    build:
+      context: ./services/api
+    environment:
+      HTTP_ADDR: ":8080"
+      BASE_URL: "http://localhost:8080"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./services/api:/app
+      - go-mod-cache:/go/pkg/mod
+
+volumes:
+  go-mod-cache:
