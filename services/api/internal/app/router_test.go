@@ -58,6 +58,26 @@ func TestUploadAndCreateQuizRoutes(t *testing.T) {
 	}
 }
 
+func TestHealthRoute(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := testRouter()
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /health status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json decode: %v", err)
+	}
+	if response["status"] != "ok" {
+		t.Fatalf("status = %q, want ok", response["status"])
+	}
+}
+
 func postJSON(t *testing.T, handler http.Handler, path string, body any, wantStatus int) map[string]any {
 	t.Helper()
 

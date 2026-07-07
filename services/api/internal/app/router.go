@@ -25,6 +25,9 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 
 	router.POST("/uploads/presign", func(c *gin.Context) {
 		var req struct {
