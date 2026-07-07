@@ -1,0 +1,89 @@
+name: API Lambda CD
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/api-lambda-cd.yml"
+      - "services/api/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/api-lambda-cd.yml"
+      - "services/api/**"
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ap-northeast-1
+  LAMBDA_FUNCTION_NAME: guess-the-celebrity-api
+
+jobs:
+  build:
+    name: Build Lambda package
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/api/go.mod
+          cache-dependency-path: services/api/go.sum
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build bootstrap binary
+        run: |
+          mkdir -p ../../dist
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build \
+            -trimpath \
+            -ldflags="-s -w" \
+            -o ../../dist/bootstrap \
+            ./cmd/api
+
+      - name: Package zip
+        run: |
+          cd ../../dist
+          zip -q lambda-api.zip bootstrap
+
+      - name: Upload Lambda package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-lambda-package
+          path: dist/lambda-api.zip
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy Lambda
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Download Lambda package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: api-lambda-package
+          path: dist
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::652992946895:role/guess_the_celebrity_lambda_cd
+          role-session-name: github-actions-lambda-cd
+
+      - name: Update Lambda function code
+        run: |
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --zip-file fileb://dist/lambda-api.zip
+          aws lambda wait function-updated \
+            --function-name "$LAMBDA_FUNCTION_NAME"
