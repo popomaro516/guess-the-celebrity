@@ -17,12 +17,13 @@ const (
 type Service struct {
 	images    ImageRepository
 	presigner Presigner
+	objects   ObjectStore
 	ids       IDGenerator
 	clock     Clock
 }
 
-func NewService(images ImageRepository, presigner Presigner, ids IDGenerator, clock Clock) *Service {
-	return &Service{images: images, presigner: presigner, ids: ids, clock: clock}
+func NewService(images ImageRepository, presigner Presigner, objects ObjectStore, ids IDGenerator, clock Clock) *Service {
+	return &Service{images: images, presigner: presigner, objects: objects, ids: ids, clock: clock}
 }
 
 type PresignInput struct {
@@ -71,6 +72,13 @@ func (s *Service) Complete(ctx context.Context, imageID string) (image.Image, er
 	img, err := s.images.FindByID(ctx, imageID)
 	if err != nil {
 		return image.Image{}, err
+	}
+	exists, err := s.objects.Exists(ctx, img.OriginalImageKey)
+	if err != nil {
+		return image.Image{}, err
+	}
+	if !exists {
+		return image.Image{}, ErrUploadObjectNotFound
 	}
 	img.Status = image.StatusUploaded
 	img.UpdatedAt = s.clock.Now()

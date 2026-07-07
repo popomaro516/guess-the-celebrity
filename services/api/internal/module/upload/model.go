@@ -9,7 +9,8 @@ import (
 )
 
 var (
-	ErrInvalidUpload = errors.New("invalid upload")
+	ErrInvalidUpload        = errors.New("invalid upload")
+	ErrUploadObjectNotFound = errors.New("upload object not found")
 )
 
 type ImageRepository interface {
@@ -20,6 +21,10 @@ type ImageRepository interface {
 
 type Presigner interface {
 	PresignPut(ctx context.Context, objectKey string, contentType string, expiresIn time.Duration) (string, error)
+}
+
+type ObjectStore interface {
+	Exists(ctx context.Context, objectKey string) (bool, error)
 }
 
 type IDGenerator interface {

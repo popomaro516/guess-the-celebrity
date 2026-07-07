@@ -16,6 +16,7 @@ import (
 	"github.com/tomy/guess-the-celebrity/services/api/internal/platform/localdb"
 	"github.com/tomy/guess-the-celebrity/services/api/internal/platform/localpresign"
 	"github.com/tomy/guess-the-celebrity/services/api/internal/platform/localqueue"
+	"github.com/tomy/guess-the-celebrity/services/api/internal/platform/localstorage"
 )
 
 func TestUploadAndCreateQuizRoutes(t *testing.T) {
@@ -111,9 +112,10 @@ func testRouter() http.Handler {
 	clock := fixedClock{}
 	queue := localqueue.NewCropJobQueue()
 	presigner := localpresign.NewPresigner("http://localhost:8080")
+	objects := localstorage.NewObjectStore()
 
 	return app.NewRouter(app.Dependencies{
-		UploadService:  upload.NewService(imageRepo, presigner, ids, clock),
+		UploadService:  upload.NewService(imageRepo, presigner, objects, ids, clock),
 		QuizService:    quiz.NewService(quizRepo, imageRepo, queue, ids, clock),
 		AttemptService: attempt.NewService(attemptRepo, quizRepo, imageRepo, ids, clock),
 		BaseURL:        "http://localhost:8080",
