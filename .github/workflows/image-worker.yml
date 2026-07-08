@@ -1,0 +1,88 @@
+name: Image Worker
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/image-worker.yml"
+      - "services/image-worker/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/image-worker.yml"
+      - "services/image-worker/**"
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ap-northeast-1
+  LAMBDA_FUNCTION_ARN: arn:aws:lambda:ap-northeast-1:652992946895:function:guess_the_celebrity_image_worker
+
+jobs:
+  build:
+    name: Build Lambda package
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/image-worker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/image-worker/requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest
+
+      - name: Package Lambda
+        run: |
+          rm -rf build ../../dist/lambda-image-worker.zip
+          mkdir -p build ../../dist
+          pip install -r requirements.txt -t build
+          cp -R src/image_worker build/
+          cd build
+          zip -q -r ../../../dist/lambda-image-worker.zip .
+
+      - name: Upload Lambda package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-worker-lambda-package
+          path: dist/lambda-image-worker.zip
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy Lambda
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Download Lambda package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: image-worker-lambda-package
+          path: dist
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::652992946895:role/guess_the_celebrity_lambda_cd
+          role-session-name: github-actions-image-worker-cd
+
+      - name: Update Lambda function code
+        run: |
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_FUNCTION_ARN" \
+            --zip-file fileb://dist/lambda-image-worker.zip
+          aws lambda wait function-updated \
+            --function-name "$LAMBDA_FUNCTION_ARN"
