@@ -2,29 +2,17 @@ package attempt
 
 import (
 	"context"
-	"time"
 
 	"github.com/tomy/guess-the-celebrity/server/api/internal/module/quiz"
 )
 
 type Service struct {
-	repo    Repository
 	quizzes QuizRepository
 	images  ImageRepository
-	ids     IDGenerator
-	clock   Clock
 }
 
-type IDGenerator interface {
-	NewID(prefix string) string
-}
-
-type Clock interface {
-	Now() time.Time
-}
-
-func NewService(repo Repository, quizzes QuizRepository, images ImageRepository, ids IDGenerator, clock Clock) *Service {
-	return &Service{repo: repo, quizzes: quizzes, images: images, ids: ids, clock: clock}
+func NewService(quizzes QuizRepository, images ImageRepository) *Service {
+	return &Service{quizzes: quizzes, images: images}
 }
 
 type AnswerInput struct {
@@ -49,16 +37,6 @@ func (s *Service) Answer(ctx context.Context, in AnswerInput) (AnswerOutput, err
 	}
 
 	correct := in.Answer == q.Answer
-	if err := s.repo.Save(ctx, Attempt{
-		ID:        s.ids.NewID("attempt"),
-		QuizID:    in.QuizID,
-		UserID:    in.UserID,
-		Answer:    in.Answer,
-		IsCorrect: correct,
-		CreatedAt: s.clock.Now(),
-	}); err != nil {
-		return AnswerOutput{}, err
-	}
 	if !correct {
 		return AnswerOutput{Correct: false}, nil
 	}

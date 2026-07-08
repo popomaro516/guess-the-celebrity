@@ -92,16 +92,22 @@ def lambda_handler(event: dict[str, Any], _context: Any) -> dict[str, list[dict[
 
 
 class Worker:
-    def __init__(self, s3_client: Any, dynamodb_client: Any, bucket: str, table_name: str):
+    def __init__(
+        self,
+        s3_client: Any,
+        dynamodb_client: Any,
+        bucket: str,
+        quizzes_table_name: str,
+    ):
         if not bucket:
             raise ValueError("S3_BUCKET is required")
-        if not table_name:
-            raise ValueError("DYNAMODB_TABLE_NAME is required")
+        if not quizzes_table_name:
+            raise ValueError("DYNAMODB_QUIZZES_TABLE_NAME is required")
 
         self.s3 = s3_client
         self.dynamodb = dynamodb_client
         self.bucket = bucket
-        self.table_name = table_name
+        self.quizzes_table_name = quizzes_table_name
 
     @classmethod
     def from_env(cls) -> "Worker":
@@ -109,7 +115,7 @@ class Worker:
             s3_client=boto3.client("s3"),
             dynamodb_client=boto3.client("dynamodb"),
             bucket=os.environ.get("S3_BUCKET", ""),
-            table_name=os.environ.get("DYNAMODB_TABLE_NAME", ""),
+            quizzes_table_name=os.environ.get("DYNAMODB_QUIZZES_TABLE_NAME", ""),
         )
 
     def handle_message(self, body: str, message_id: str = "") -> None:
@@ -164,10 +170,9 @@ class Worker:
 
     def _mark_quiz_status(self, quiz_id: str, status: str) -> None:
         self.dynamodb.update_item(
-            TableName=self.table_name,
+            TableName=self.quizzes_table_name,
             Key={
-                "PK": {"S": f"QUIZ#{quiz_id}"},
-                "SK": {"S": "METADATA"},
+                "quiz_id": {"S": quiz_id},
             },
             UpdateExpression="SET #status = :status, updated_at = :updated_at",
             ExpressionAttributeNames={"#status": "status"},
