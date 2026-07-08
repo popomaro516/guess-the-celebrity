@@ -5,7 +5,15 @@ import pytest
 from PIL import Image
 
 from image_worker import handler
-from image_worker.handler import Crop, InvalidCropJobError, Worker, crop_box, crop_to_webp, lambda_handler, parse_crop_job
+from image_worker.handler import (
+    Crop,
+    InvalidCropJobError,
+    Worker,
+    crop_box,
+    crop_to_webp,
+    lambda_handler,
+    parse_crop_job,
+)
 
 
 def test_parse_crop_job_accepts_expected_payload():
