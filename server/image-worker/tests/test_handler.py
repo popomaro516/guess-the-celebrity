@@ -1,4 +1,5 @@
 import json
+import logging
 from io import BytesIO
 
 import pytest
@@ -163,11 +164,25 @@ def test_lambda_handler_returns_partial_batch_failures(monkeypatch):
     )
 
     assert got == {"batchItemFailures": [{"itemIdentifier": "msg-2"}]}
-    assert fake_worker.handled_bodies == ["ok", "bad"]
+    assert fake_worker.handled_messages == [("ok", "msg-1"), ("bad", "msg-2")]
 
 
 def test_default_lambda_handler_entrypoint_matches_worker_handler():
     assert default_lambda_handler is lambda_handler
+
+
+def test_json_log_formatter_includes_extra_fields():
+    record = logging.LogRecord("image_worker", logging.INFO, "handler.py", 10, "crop job completed", (), None)
+    record.quiz_id = "quiz_123"
+    record.duration_ms = 42
+
+    got = json.loads(handler.JSONLogFormatter().format(record))
+
+    assert got["level"] == "INFO"
+    assert got["msg"] == "crop job completed"
+    assert got["logger"] == "image_worker"
+    assert got["quiz_id"] == "quiz_123"
+    assert got["duration_ms"] == 42
 
 
 class FakeBody:
@@ -212,9 +227,9 @@ class FakeDynamoDB:
 class FakeWorker:
     def __init__(self, fail_bodies):
         self.fail_bodies = set(fail_bodies)
-        self.handled_bodies = []
+        self.handled_messages = []
 
-    def handle_message(self, body):
-        self.handled_bodies.append(body)
+    def handle_message(self, body, message_id=""):
+        self.handled_messages.append((body, message_id))
         if body in self.fail_bodies:
             raise RuntimeError("boom")
