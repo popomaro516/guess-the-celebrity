@@ -13,7 +13,7 @@ import (
 func TestPresignCreatesPendingImage(t *testing.T) {
 	images := newFakeImageRepository()
 	presigner := fakePresigner{}
-	svc := upload.NewService(images, presigner, fixedIDs{"img_123"}, fixedClock{})
+	svc := upload.NewService(images, presigner, fakeObjectStore{exists: true}, fixedIDs{"img_123"}, fixedClock{})
 
 	got, err := svc.Presign(context.Background(), upload.PresignInput{
 		Filename:    "cat.jpg",
@@ -43,7 +43,7 @@ func TestPresignCreatesPendingImage(t *testing.T) {
 }
 
 func TestPresignRejectsUnsupportedContentType(t *testing.T) {
-	svc := upload.NewService(newFakeImageRepository(), fakePresigner{}, fixedIDs{"img_123"}, fixedClock{})
+	svc := upload.NewService(newFakeImageRepository(), fakePresigner{}, fakeObjectStore{exists: true}, fixedIDs{"img_123"}, fixedClock{})
 
 	_, err := svc.Presign(context.Background(), upload.PresignInput{
 		Filename:    "cat.gif",
@@ -57,8 +57,8 @@ func TestPresignRejectsUnsupportedContentType(t *testing.T) {
 
 func TestCompleteMarksImageUploaded(t *testing.T) {
 	images := newFakeImageRepository()
-	images.save(image.Image{ID: "img_123", Status: image.StatusPendingUpload})
-	svc := upload.NewService(images, fakePresigner{}, fixedIDs{"img_123"}, fixedClock{})
+	images.save(image.Image{ID: "img_123", OriginalImageKey: "originals/anonymous/img_123/source.jpg", Status: image.StatusPendingUpload})
+	svc := upload.NewService(images, fakePresigner{}, fakeObjectStore{exists: true}, fixedIDs{"img_123"}, fixedClock{})
 
 	got, err := svc.Complete(context.Background(), "img_123")
 	if err != nil {
@@ -66,6 +66,17 @@ func TestCompleteMarksImageUploaded(t *testing.T) {
 	}
 	if got.Status != image.StatusUploaded {
 		t.Fatalf("Status = %q, want %q", got.Status, image.StatusUploaded)
+	}
+}
+
+func TestCompleteRejectsMissingObject(t *testing.T) {
+	images := newFakeImageRepository()
+	images.save(image.Image{ID: "img_123", OriginalImageKey: "originals/anonymous/img_123/source.jpg", Status: image.StatusPendingUpload})
+	svc := upload.NewService(images, fakePresigner{}, fakeObjectStore{exists: false}, fixedIDs{"img_123"}, fixedClock{})
+
+	_, err := svc.Complete(context.Background(), "img_123")
+	if !errors.Is(err, upload.ErrUploadObjectNotFound) {
+		t.Fatalf("err = %v, want %v", err, upload.ErrUploadObjectNotFound)
 	}
 }
 
@@ -102,6 +113,14 @@ type fakePresigner struct{}
 
 func (fakePresigner) PresignPut(_ context.Context, objectKey string, _ string, _ time.Duration) (string, error) {
 	return "http://localhost:8080/local-upload/" + objectKey, nil
+}
+
+type fakeObjectStore struct {
+	exists bool
+}
+
+func (s fakeObjectStore) Exists(_ context.Context, _ string) (bool, error) {
+	return s.exists, nil
 }
 
 type fixedIDs struct {

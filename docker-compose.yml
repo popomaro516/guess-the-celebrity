@@ -2,6 +2,9 @@ services:
   api:
     build:
       context: ./services/api
+    env_file:
+      - path: ./services/api/.env.local
+        required: false
     environment:
       HTTP_ADDR: ":8080"
       BASE_URL: "http://localhost:8080"
@@ -9,6 +12,7 @@ services:
       - "8080:8080"
     volumes:
       - ./services/api:/app
+      - ~/.aws:/root/.aws:ro
       - go-mod-cache:/go/pkg/mod
 
 volumes:

@@ -166,7 +166,8 @@ func respondError(c *gin.Context, err error) {
 		errors.Is(err, quiz.ErrInvalidChoices),
 		errors.Is(err, quiz.ErrImageNotUploaded),
 		errors.Is(err, quiz.ErrQuizNotReady),
-		errors.Is(err, attempt.ErrQuizNotPublished):
+		errors.Is(err, attempt.ErrQuizNotPublished),
+		errors.Is(err, upload.ErrUploadObjectNotFound):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, image.ErrImageNotFound), errors.Is(err, quiz.ErrQuizNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})

@@ -1,11 +1,8 @@
 package quiz
 
 import (
-	"context"
 	"errors"
 	"time"
-
-	"github.com/tomy/guess-the-celebrity/services/api/internal/module/image"
 )
 
 var (
@@ -54,23 +51,4 @@ type Quiz struct {
 	Status          Status
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
-}
-
-type Repository interface {
-	Save(ctx context.Context, q Quiz) error
-	FindByID(ctx context.Context, id string) (Quiz, error)
-	FindRandomPublished(ctx context.Context) (Quiz, error)
-	Update(ctx context.Context, q Quiz) error
-}
-
-type ImageRepository interface {
-	FindByID(ctx context.Context, id string) (image.Image, error)
-}
-
-type IDGenerator interface {
-	NewID(prefix string) string
-}
-
-type Clock interface {
-	Now() time.Time
 }
