@@ -29,6 +29,10 @@ func Require(verifier TokenVerifier) gin.HandlerFunc {
 
 func Disabled() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		c.Set(principalKey, Principal{
+			Subject:  "local-development-user",
+			Username: "local-development-user",
+		})
 		c.Next()
 	}
 }

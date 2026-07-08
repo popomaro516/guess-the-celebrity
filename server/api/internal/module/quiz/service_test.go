@@ -22,7 +22,7 @@ func TestCreateStoresProcessingQuizAndEnqueuesCropJob(t *testing.T) {
 		Status:           image.StatusUploaded,
 	})
 
-	got, err := svc.Create(context.Background(), quiz.CreateInput{
+	got, err := svc.Create(context.Background(), "user-123", quiz.CreateInput{
 		ImageID:    "img_123",
 		Question:   "これは何の動物？",
 		Answer:     "cat",
@@ -44,6 +44,9 @@ func TestCreateStoresProcessingQuizAndEnqueuesCropJob(t *testing.T) {
 	if saved.Status != quiz.StatusProcessing {
 		t.Fatalf("status = %s, want %s", saved.Status, quiz.StatusProcessing)
 	}
+	if saved.CreatorUserID != "user-123" {
+		t.Fatalf("creator user ID = %q, want user-123", saved.CreatorUserID)
+	}
 	if len(queue.jobs) != 1 {
 		t.Fatalf("queued jobs = %d, want 1", len(queue.jobs))
 	}
@@ -62,7 +65,7 @@ func TestCreateRejectsInvalidCrop(t *testing.T) {
 	repo := newFakeRepository()
 	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
 
-	_, err := svc.Create(context.Background(), quiz.CreateInput{
+	_, err := svc.Create(context.Background(), "user-123", quiz.CreateInput{
 		ImageID:    "img_123",
 		Question:   "これは何の動物？",
 		Answer:     "cat",
