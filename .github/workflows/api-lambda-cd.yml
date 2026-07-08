@@ -4,13 +4,13 @@ on:
   pull_request:
     paths:
       - ".github/workflows/api-lambda-cd.yml"
-      - "services/api/**"
+      - "server/api/**"
   push:
     branches:
       - main
     paths:
       - ".github/workflows/api-lambda-cd.yml"
-      - "services/api/**"
+      - "server/api/**"
 
 permissions:
   contents: read
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: services/api
+        working-directory: server/api
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,8 +34,8 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: services/api/go.mod
-          cache-dependency-path: services/api/go.sum
+          go-version-file: server/api/go.mod
+          cache-dependency-path: server/api/go.sum
 
       - name: Run tests
         run: go test ./...

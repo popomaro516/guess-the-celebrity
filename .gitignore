@@ -149,4 +149,5 @@ vite.config.ts.timestamp-*
 __pycache__/
 *.py[cod]
 .pytest_cache/
-services/image-worker/build/
+.ruff_cache/
+server/image-worker/build/
