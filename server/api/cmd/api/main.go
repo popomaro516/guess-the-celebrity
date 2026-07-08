@@ -12,6 +12,7 @@ import (
 	awssqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/gin-gonic/gin"
 	"github.com/tomy/guess-the-celebrity/server/api/internal/app"
+	"github.com/tomy/guess-the-celebrity/server/api/internal/auth"
 	"github.com/tomy/guess-the-celebrity/server/api/internal/config"
 	"github.com/tomy/guess-the-celebrity/server/api/internal/module/attempt"
 	"github.com/tomy/guess-the-celebrity/server/api/internal/module/job"
@@ -65,11 +66,25 @@ func main() {
 	realClock := clock.New()
 	queue := cropQueue(cfg, awsCfg)
 	presigner, objects := uploadDependencies(cfg, awsCfg)
+	authMiddleware := auth.Disabled()
+	if !cfg.AuthDisabled {
+		if !cfg.HasCompleteCognitoConfig() {
+			logger.Error("Cognito user pool ID and app client ID must be configured")
+			os.Exit(1)
+		}
+		verifier, err := auth.NewCognitoVerifier(cfg.CognitoIssuer(), cfg.CognitoAppClientID, nil)
+		if err != nil {
+			logger.Error("configure Cognito authentication", "error", err)
+			os.Exit(1)
+		}
+		authMiddleware = auth.Require(verifier)
+	}
 
 	router := app.NewRouter(app.Dependencies{
 		UploadService:  upload.NewService(imageRepo, presigner, objects, ids, realClock),
 		QuizService:    quiz.NewService(quizRepo, publicFeedRepo, imageRepo, queue, ids, realClock),
 		AttemptService: attempt.NewService(quizRepo, imageRepo),
+		AuthMiddleware: authMiddleware,
 		BaseURL:        cfg.BaseURL,
 		AssetBaseURL:   cfg.AssetBaseURL,
 		Logger:         logger,
@@ -82,6 +97,7 @@ func main() {
 		"dynamodb_configured", cfg.HasCompleteDynamoDBConfig(),
 		"crop_queue_configured", cfg.CropQueueURL != "",
 		"asset_base_url_configured", cfg.AssetBaseURL != "",
+		"auth_disabled", cfg.AuthDisabled,
 	)
 	if err := router.Run(cfg.HTTPAddr); err != nil {
 		logger.Error("api stopped", "error", err)
