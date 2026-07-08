@@ -62,6 +62,38 @@ func TestUploadAndCreateQuizRoutes(t *testing.T) {
 	}
 }
 
+func TestCreateQuizStoresAuthenticatedUserSubject(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router, quizRepo := newTestRouter(auth.Require(acceptTokens{}))
+
+	presignBody := postJSON(t, router, "/uploads/presign", map[string]any{
+		"filename":     "cat.jpg",
+		"content_type": "image/jpeg",
+		"size":         2048,
+	}, http.StatusOK)
+	imageID := presignBody["image_id"].(string)
+	postJSON(t, router, "/images/"+imageID+"/complete", nil, http.StatusOK)
+
+	quizBody := postJSON(t, router, "/quizzes", map[string]any{
+		"image_id":   imageID,
+		"question":   "これは何の動物？",
+		"answer":     "cat",
+		"choices":    []string{"cat", "dog", "fox", "rabbit"},
+		"difficulty": "normal",
+		"crop": map[string]float64{
+			"x": 0.24, "y": 0.18, "width": 0.32, "height": 0.28,
+		},
+	}, http.StatusCreated)
+
+	saved, err := quizRepo.FindByID(context.Background(), quizBody["quiz_id"].(string))
+	if err != nil {
+		t.Fatalf("FindByID returned error: %v", err)
+	}
+	if saved.CreatorUserID != "cognito-sub-123" {
+		t.Fatalf("creator user ID = %q, want cognito-sub-123", saved.CreatorUserID)
+	}
+}
+
 func TestHealthRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := testRouter()
@@ -119,6 +151,7 @@ func postJSON(t *testing.T, handler http.Handler, path string, body any, wantSta
 	}
 	req := httptest.NewRequest(http.MethodPost, path, &requestBody)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer valid-token")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	if rec.Code != wantStatus {
@@ -133,6 +166,11 @@ func postJSON(t *testing.T, handler http.Handler, path string, body any, wantSta
 }
 
 func testRouter() http.Handler {
+	router, _ := newTestRouter(auth.Disabled())
+	return router
+}
+
+func newTestRouter(authMiddleware gin.HandlerFunc) (http.Handler, *localdb.QuizRepository) {
 	store := localdb.NewStore()
 	imageRepo := localdb.NewImageRepository(store)
 	quizRepo := localdb.NewQuizRepository(store)
@@ -142,14 +180,15 @@ func testRouter() http.Handler {
 	presigner := localpresign.NewPresigner("http://localhost:8080")
 	objects := localstorage.NewObjectStore()
 
-	return app.NewRouter(app.Dependencies{
+	router := app.NewRouter(app.Dependencies{
 		UploadService:  upload.NewService(imageRepo, presigner, objects, ids, clock),
 		QuizService:    quiz.NewService(quizRepo, quizRepo, imageRepo, queue, ids, clock),
 		AttemptService: attempt.NewService(quizRepo, imageRepo),
-		AuthMiddleware: auth.Disabled(),
+		AuthMiddleware: authMiddleware,
 		BaseURL:        "http://localhost:8080",
 		AssetBaseURL:   "http://localhost:8080",
 	})
+	return router, quizRepo
 }
 
 type sequenceIDs struct {
@@ -171,4 +210,13 @@ type rejectTokens struct{}
 
 func (rejectTokens) Verify(context.Context, string) (auth.Principal, error) {
 	return auth.Principal{}, errors.New("invalid token")
+}
+
+type acceptTokens struct{}
+
+func (acceptTokens) Verify(_ context.Context, token string) (auth.Principal, error) {
+	if token != "valid-token" {
+		return auth.Principal{}, errors.New("invalid token")
+	}
+	return auth.Principal{Subject: "cognito-sub-123"}, nil
 }

@@ -54,7 +54,10 @@ type PublicQuiz struct {
 	Difficulty      Difficulty
 }
 
-func (s *Service) Create(ctx context.Context, in CreateInput) (CreateOutput, error) {
+func (s *Service) Create(ctx context.Context, creatorUserID string, in CreateInput) (CreateOutput, error) {
+	if creatorUserID == "" {
+		return CreateOutput{}, errors.New("creator user ID is required")
+	}
 	if !validCrop(in.Crop) {
 		return CreateOutput{}, ErrInvalidCrop
 	}
@@ -75,7 +78,7 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (CreateOutput, err
 	croppedKey := "quizzes/" + id + "/crop.webp"
 	q := Quiz{
 		ID:              id,
-		CreatorUserID:   "anonymous",
+		CreatorUserID:   creatorUserID,
 		ImageID:         in.ImageID,
 		Question:        in.Question,
 		Answer:          in.Answer,

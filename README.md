@@ -21,6 +21,7 @@ COGNITO_APP_CLIENT_ID=exampleclientid
 
 Send the access token as `Authorization: Bearer <token>`. Authentication can only
 be bypassed explicitly for local development with `AUTH_DISABLED=true`.
+New quizzes store the verified access token's `sub` claim as `creator_user_id`.
 
 ## DynamoDB tables
 

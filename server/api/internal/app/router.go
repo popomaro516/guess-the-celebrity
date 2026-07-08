@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/tomy/guess-the-celebrity/server/api/internal/auth"
 	"github.com/tomy/guess-the-celebrity/server/api/internal/module/attempt"
 	"github.com/tomy/guess-the-celebrity/server/api/internal/module/image"
 	"github.com/tomy/guess-the-celebrity/server/api/internal/module/quiz"
@@ -80,6 +81,17 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	})
 
 	router.POST("/quizzes", deps.AuthMiddleware, func(c *gin.Context) {
+		principal, ok := auth.PrincipalFromContext(c)
+		if !ok {
+			logger.ErrorContext(c.Request.Context(), "authenticated principal missing",
+				"method", c.Request.Method,
+				"path", c.Request.URL.Path,
+				"route", c.FullPath(),
+				"request_id", requestID(c),
+			)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+			return
+		}
 		var req struct {
 			ImageID    string          `json:"image_id" binding:"required"`
 			Question   string          `json:"question" binding:"required"`
@@ -91,7 +103,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		if !bindJSON(c, &req) {
 			return
 		}
-		out, err := deps.QuizService.Create(c.Request.Context(), quiz.CreateInput{
+		out, err := deps.QuizService.Create(c.Request.Context(), principal.Subject, quiz.CreateInput{
 			ImageID:    req.ImageID,
 			Question:   req.Question,
 			Answer:     req.Answer,
