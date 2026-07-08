@@ -69,11 +69,6 @@ func getString(item map[string]types.AttributeValue, name string) string {
 	return value.Value
 }
 
-func getBool(item map[string]types.AttributeValue, name string) bool {
-	value, ok := item[name].(*types.AttributeValueMemberBOOL)
-	return ok && value.Value
-}
-
 func getInt64(item map[string]types.AttributeValue, name string) int64 {
 	value, ok := item[name].(*types.AttributeValueMemberN)
 	if !ok {
