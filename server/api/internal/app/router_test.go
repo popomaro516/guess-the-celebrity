@@ -2,7 +2,9 @@ package app_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/tomy/guess-the-celebrity/server/api/internal/app"
+	"github.com/tomy/guess-the-celebrity/server/api/internal/auth"
 	"github.com/tomy/guess-the-celebrity/server/api/internal/module/attempt"
 	"github.com/tomy/guess-the-celebrity/server/api/internal/module/quiz"
 	"github.com/tomy/guess-the-celebrity/server/api/internal/module/upload"
@@ -79,6 +82,32 @@ func TestHealthRoute(t *testing.T) {
 	}
 }
 
+func TestAuthoringRoutesRequireAuthentication(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := app.NewRouter(app.Dependencies{
+		AuthMiddleware: auth.Require(rejectTokens{}),
+	})
+
+	paths := []string{
+		"/uploads/presign",
+		"/images/img_1/complete",
+		"/quizzes",
+		"/quizzes/quiz_1/publish",
+	}
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, path, nil)
+			rec := httptest.NewRecorder()
+
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnauthorized {
+				t.Fatalf("POST %s status = %d, want %d", path, rec.Code, http.StatusUnauthorized)
+			}
+		})
+	}
+}
+
 func postJSON(t *testing.T, handler http.Handler, path string, body any, wantStatus int) map[string]any {
 	t.Helper()
 
@@ -117,6 +146,7 @@ func testRouter() http.Handler {
 		UploadService:  upload.NewService(imageRepo, presigner, objects, ids, clock),
 		QuizService:    quiz.NewService(quizRepo, quizRepo, imageRepo, queue, ids, clock),
 		AttemptService: attempt.NewService(quizRepo, imageRepo),
+		AuthMiddleware: auth.Disabled(),
 		BaseURL:        "http://localhost:8080",
 		AssetBaseURL:   "http://localhost:8080",
 	})
@@ -135,4 +165,10 @@ type fixedClock struct{}
 
 func (fixedClock) Now() time.Time {
 	return time.Date(2026, 7, 3, 0, 0, 0, 0, time.UTC)
+}
+
+type rejectTokens struct{}
+
+func (rejectTokens) Verify(context.Context, string) (auth.Principal, error) {
+	return auth.Principal{}, errors.New("invalid token")
 }

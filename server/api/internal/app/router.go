@@ -19,6 +19,7 @@ type Dependencies struct {
 	UploadService  *upload.Service
 	QuizService    *quiz.Service
 	AttemptService *attempt.Service
+	AuthMiddleware gin.HandlerFunc
 	BaseURL        string
 	AssetBaseURL   string
 	Logger         *slog.Logger
@@ -40,7 +41,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	router.POST("/uploads/presign", func(c *gin.Context) {
+	router.POST("/uploads/presign", deps.AuthMiddleware, func(c *gin.Context) {
 		var req struct {
 			Filename    string `json:"filename" binding:"required"`
 			ContentType string `json:"content_type" binding:"required"`
@@ -66,7 +67,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		})
 	})
 
-	router.POST("/images/:image_id/complete", func(c *gin.Context) {
+	router.POST("/images/:image_id/complete", deps.AuthMiddleware, func(c *gin.Context) {
 		img, err := deps.UploadService.Complete(c.Request.Context(), c.Param("image_id"))
 		if err != nil {
 			respondError(c, logger, err)
@@ -78,7 +79,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		})
 	})
 
-	router.POST("/quizzes", func(c *gin.Context) {
+	router.POST("/quizzes", deps.AuthMiddleware, func(c *gin.Context) {
 		var req struct {
 			ImageID    string          `json:"image_id" binding:"required"`
 			Question   string          `json:"question" binding:"required"`
@@ -123,7 +124,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		})
 	})
 
-	router.POST("/quizzes/:quiz_id/publish", func(c *gin.Context) {
+	router.POST("/quizzes/:quiz_id/publish", deps.AuthMiddleware, func(c *gin.Context) {
 		out, err := deps.QuizService.Publish(c.Request.Context(), c.Param("quiz_id"))
 		if err != nil {
 			respondError(c, logger, err)

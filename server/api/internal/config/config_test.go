@@ -42,3 +42,30 @@ func TestLoadDynamoDBTableNames(t *testing.T) {
 		t.Fatalf("DynamoDBQuizFeedTableName = %q", cfg.DynamoDBQuizFeedTableName)
 	}
 }
+
+func TestLoadCognitoConfig(t *testing.T) {
+	t.Setenv("AWS_REGION", "us-west-2")
+	t.Setenv("COGNITO_USER_POOL_ID", "us-west-2_example")
+	t.Setenv("COGNITO_APP_CLIENT_ID", "client-id")
+	t.Setenv("AUTH_DISABLED", "false")
+
+	cfg := Load()
+
+	if !cfg.HasCompleteCognitoConfig() {
+		t.Fatal("HasCompleteCognitoConfig() = false, want true")
+	}
+	if got, want := cfg.CognitoIssuer(), "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_example"; got != want {
+		t.Fatalf("CognitoIssuer() = %q, want %q", got, want)
+	}
+	if cfg.AuthDisabled {
+		t.Fatal("AuthDisabled = true, want false")
+	}
+}
+
+func TestAuthCanBeExplicitlyDisabled(t *testing.T) {
+	t.Setenv("AUTH_DISABLED", "true")
+
+	if cfg := Load(); !cfg.AuthDisabled {
+		t.Fatal("AuthDisabled = false, want true")
+	}
+}

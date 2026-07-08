@@ -1,6 +1,10 @@
 package config
 
-import "os"
+import (
+	"os"
+	"strconv"
+	"strings"
+)
 
 type Config struct {
 	HTTPAddr                  string
@@ -12,6 +16,9 @@ type Config struct {
 	DynamoDBQuizzesTableName  string
 	DynamoDBQuizFeedTableName string
 	CropQueueURL              string
+	AuthDisabled              bool
+	CognitoUserPoolID         string
+	CognitoAppClientID        string
 }
 
 func Load() Config {
@@ -31,7 +38,18 @@ func Load() Config {
 		DynamoDBQuizzesTableName:  os.Getenv("DYNAMODB_QUIZZES_TABLE_NAME"),
 		DynamoDBQuizFeedTableName: os.Getenv("DYNAMODB_QUIZ_FEED_TABLE_NAME"),
 		CropQueueURL:              cropQueueURL,
+		AuthDisabled:              boolEnv("AUTH_DISABLED"),
+		CognitoUserPoolID:         os.Getenv("COGNITO_USER_POOL_ID"),
+		CognitoAppClientID:        os.Getenv("COGNITO_APP_CLIENT_ID"),
 	}
+}
+
+func (c Config) CognitoIssuer() string {
+	return "https://cognito-idp." + c.AWSRegion + ".amazonaws.com/" + c.CognitoUserPoolID
+}
+
+func (c Config) HasCompleteCognitoConfig() bool {
+	return c.CognitoUserPoolID != "" && c.CognitoAppClientID != ""
 }
 
 func (c Config) HasDynamoDBConfig() bool {
@@ -51,4 +69,9 @@ func getenv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func boolEnv(key string) bool {
+	value, err := strconv.ParseBool(strings.TrimSpace(os.Getenv(key)))
+	return err == nil && value
 }
