@@ -116,9 +116,10 @@ func testRouter() http.Handler {
 
 	return app.NewRouter(app.Dependencies{
 		UploadService:  upload.NewService(imageRepo, presigner, objects, ids, clock),
-		QuizService:    quiz.NewService(quizRepo, imageRepo, queue, ids, clock),
+		QuizService:    quiz.NewService(quizRepo, quizRepo, imageRepo, queue, ids, clock),
 		AttemptService: attempt.NewService(attemptRepo, quizRepo, imageRepo, ids, clock),
 		BaseURL:        "http://localhost:8080",
+		AssetBaseURL:   "http://localhost:8080",
 	})
 }
 

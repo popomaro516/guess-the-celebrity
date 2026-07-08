@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/tomy/guess-the-celebrity/services/api/internal/module/attempt"
@@ -16,6 +17,7 @@ type Dependencies struct {
 	QuizService    *quiz.Service
 	AttemptService *attempt.Service
 	BaseURL        string
+	AssetBaseURL   string
 }
 
 func NewRouter(deps Dependencies) *gin.Engine {
@@ -106,7 +108,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{
 			"quiz_id":           out.ID,
 			"question":          out.Question,
-			"cropped_image_url": assetURL(deps.BaseURL, out.CroppedImageKey),
+			"cropped_image_url": assetURL(deps.AssetBaseURL, out.CroppedImageKey),
 			"choices":           out.Choices,
 			"difficulty":        out.Difficulty,
 		})
@@ -143,7 +145,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		response := gin.H{"correct": out.Correct}
 		if out.Correct {
 			response["correct_answer"] = out.CorrectAnswer
-			response["original_image_url"] = assetURL(deps.BaseURL, out.OriginalImageKey)
+			response["original_image_url"] = assetURL(deps.AssetBaseURL, out.OriginalImageKey)
 		}
 		c.JSON(http.StatusOK, response)
 	})
@@ -177,5 +179,5 @@ func respondError(c *gin.Context, err error) {
 }
 
 func assetURL(baseURL, key string) string {
-	return baseURL + "/assets/" + key
+	return strings.TrimRight(baseURL, "/") + "/" + strings.TrimLeft(key, "/")
 }

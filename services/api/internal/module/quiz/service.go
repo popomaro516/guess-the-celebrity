@@ -2,6 +2,9 @@ package quiz
 
 import (
 	"context"
+	cryptorand "crypto/rand"
+	"errors"
+	"math/big"
 	"time"
 
 	"github.com/tomy/guess-the-celebrity/services/api/internal/module/image"
@@ -9,11 +12,12 @@ import (
 )
 
 type Service struct {
-	repo   Repository
-	images ImageRepository
-	queue  job.CropJobQueue
-	ids    IDGenerator
-	clock  Clock
+	repo       Repository
+	publicFeed PublicFeedRepository
+	images     ImageRepository
+	queue      job.CropJobQueue
+	ids        IDGenerator
+	clock      Clock
 }
 
 type IDGenerator interface {
@@ -24,8 +28,8 @@ type Clock interface {
 	Now() time.Time
 }
 
-func NewService(repo Repository, images ImageRepository, queue job.CropJobQueue, ids IDGenerator, clock Clock) *Service {
-	return &Service{repo: repo, images: images, queue: queue, ids: ids, clock: clock}
+func NewService(repo Repository, publicFeed PublicFeedRepository, images ImageRepository, queue job.CropJobQueue, ids IDGenerator, clock Clock) *Service {
+	return &Service{repo: repo, publicFeed: publicFeed, images: images, queue: queue, ids: ids, clock: clock}
 }
 
 type CreateInput struct {
@@ -71,6 +75,7 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (CreateOutput, err
 	croppedKey := "quizzes/" + id + "/crop.webp"
 	q := Quiz{
 		ID:              id,
+		CreatorUserID:   "anonymous",
 		ImageID:         in.ImageID,
 		Question:        in.Question,
 		Answer:          in.Answer,
@@ -119,17 +124,38 @@ func (s *Service) Publish(ctx context.Context, quizID string) (CreateOutput, err
 }
 
 func (s *Service) RandomPublished(ctx context.Context) (PublicQuiz, error) {
-	q, err := s.repo.FindRandomPublished(ctx)
+	quizIDs, err := s.publicFeed.FindPublicQuizCandidateIDs(ctx, 10)
 	if err != nil {
 		return PublicQuiz{}, err
 	}
-	return PublicQuiz{
-		ID:              q.ID,
-		Question:        q.Question,
-		CroppedImageKey: q.CroppedImageKey,
-		Choices:         append([]string(nil), q.Choices...),
-		Difficulty:      q.Difficulty,
-	}, nil
+	if len(quizIDs) == 0 {
+		return PublicQuiz{}, ErrQuizNotFound
+	}
+
+	index, err := randomIndex(len(quizIDs))
+	if err != nil {
+		return PublicQuiz{}, err
+	}
+	for offset := range quizIDs {
+		q, err := s.repo.FindByID(ctx, quizIDs[(index+offset)%len(quizIDs)])
+		if errors.Is(err, ErrQuizNotFound) {
+			continue
+		}
+		if err != nil {
+			return PublicQuiz{}, err
+		}
+		if q.Status != StatusPublished {
+			continue
+		}
+		return PublicQuiz{
+			ID:              q.ID,
+			Question:        q.Question,
+			CroppedImageKey: q.CroppedImageKey,
+			Choices:         append([]string(nil), q.Choices...),
+			Difficulty:      q.Difficulty,
+		}, nil
+	}
+	return PublicQuiz{}, ErrQuizNotFound
 }
 
 func validCrop(c Crop) bool {
@@ -158,4 +184,12 @@ func validChoices(answer string, choices []string) bool {
 		}
 	}
 	return hasAnswer
+}
+
+func randomIndex(length int) (int, error) {
+	n, err := cryptorand.Int(cryptorand.Reader, big.NewInt(int64(length)))
+	if err != nil {
+		return 0, err
+	}
+	return int(n.Int64()), nil
 }
