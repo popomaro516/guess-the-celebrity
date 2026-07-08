@@ -15,7 +15,7 @@ func TestCreateStoresProcessingQuizAndEnqueuesCropJob(t *testing.T) {
 	repo := newFakeRepository()
 	images := newFakeImageRepository()
 	queue := &fakeCropJobQueue{}
-	svc := quiz.NewService(repo, images, queue, fixedIDs{"quiz_123"}, fixedClock{})
+	svc := quiz.NewService(repo, repo, images, queue, fixedIDs{"quiz_123"}, fixedClock{})
 	images.save(image.Image{
 		ID:               "img_123",
 		OriginalImageKey: "originals/anonymous/img_123/source.jpg",
@@ -59,7 +59,8 @@ func TestCreateStoresProcessingQuizAndEnqueuesCropJob(t *testing.T) {
 }
 
 func TestCreateRejectsInvalidCrop(t *testing.T) {
-	svc := quiz.NewService(newFakeRepository(), newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
+	repo := newFakeRepository()
+	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
 
 	_, err := svc.Create(context.Background(), quiz.CreateInput{
 		ImageID:    "img_123",
@@ -76,7 +77,7 @@ func TestCreateRejectsInvalidCrop(t *testing.T) {
 
 func TestPublishRequiresReadyQuiz(t *testing.T) {
 	repo := newFakeRepository()
-	svc := quiz.NewService(repo, newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
+	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
 	repo.save(quiz.Quiz{ID: "quiz_123", Status: quiz.StatusProcessing})
 
 	_, err := svc.Publish(context.Background(), "quiz_123")
@@ -110,13 +111,17 @@ func (r *fakeRepository) FindByID(_ context.Context, id string) (quiz.Quiz, erro
 	return q, nil
 }
 
-func (r *fakeRepository) FindRandomPublished(_ context.Context) (quiz.Quiz, error) {
+func (r *fakeRepository) FindPublicQuizCandidateIDs(_ context.Context, limit int) ([]string, error) {
+	ids := make([]string, 0, limit)
 	for _, q := range r.quizzes {
 		if q.Status == quiz.StatusPublished {
-			return q, nil
+			ids = append(ids, q.ID)
+			if len(ids) == limit {
+				return ids, nil
+			}
 		}
 	}
-	return quiz.Quiz{}, quiz.ErrQuizNotFound
+	return ids, nil
 }
 
 func (r *fakeRepository) Update(_ context.Context, q quiz.Quiz) error {

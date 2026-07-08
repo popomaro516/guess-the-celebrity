@@ -33,14 +33,18 @@ func (r *QuizRepository) FindByID(_ context.Context, id string) (quiz.Quiz, erro
 	return q, nil
 }
 
-func (r *QuizRepository) FindRandomPublished(_ context.Context) (quiz.Quiz, error) {
+func (r *QuizRepository) FindPublicQuizCandidateIDs(_ context.Context, limit int) ([]string, error) {
+	ids := make([]string, 0, limit)
 	for _, doc := range r.store.list(quizzesCollection) {
 		q, ok := doc.(quiz.Quiz)
 		if ok && q.Status == quiz.StatusPublished {
-			return q, nil
+			ids = append(ids, q.ID)
+			if len(ids) == limit {
+				return ids, nil
+			}
 		}
 	}
-	return quiz.Quiz{}, quiz.ErrQuizNotFound
+	return ids, nil
 }
 
 func (r *QuizRepository) Update(ctx context.Context, q quiz.Quiz) error {
