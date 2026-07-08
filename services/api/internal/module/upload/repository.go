@@ -2,15 +2,9 @@ package upload
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/tomy/guess-the-celebrity/services/api/internal/module/image"
-)
-
-var (
-	ErrInvalidUpload        = errors.New("invalid upload")
-	ErrUploadObjectNotFound = errors.New("upload object not found")
 )
 
 type ImageRepository interface {
@@ -25,12 +19,4 @@ type Presigner interface {
 
 type ObjectStore interface {
 	Exists(ctx context.Context, objectKey string) (bool, error)
-}
-
-type IDGenerator interface {
-	NewID(prefix string) string
-}
-
-type Clock interface {
-	Now() time.Time
 }

@@ -2,6 +2,7 @@ package quiz
 
 import (
 	"context"
+	"time"
 
 	"github.com/tomy/guess-the-celebrity/services/api/internal/module/image"
 	"github.com/tomy/guess-the-celebrity/services/api/internal/module/job"
@@ -13,6 +14,14 @@ type Service struct {
 	queue  job.CropJobQueue
 	ids    IDGenerator
 	clock  Clock
+}
+
+type IDGenerator interface {
+	NewID(prefix string) string
+}
+
+type Clock interface {
+	Now() time.Time
 }
 
 func NewService(repo Repository, images ImageRepository, queue job.CropJobQueue, ids IDGenerator, clock Clock) *Service {

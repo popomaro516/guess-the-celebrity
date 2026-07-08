@@ -22,6 +22,14 @@ type Service struct {
 	clock     Clock
 }
 
+type IDGenerator interface {
+	NewID(prefix string) string
+}
+
+type Clock interface {
+	Now() time.Time
+}
+
 func NewService(images ImageRepository, presigner Presigner, objects ObjectStore, ids IDGenerator, clock Clock) *Service {
 	return &Service{images: images, presigner: presigner, objects: objects, ids: ids, clock: clock}
 }
