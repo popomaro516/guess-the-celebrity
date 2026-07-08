@@ -144,3 +144,9 @@ docs/
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+services/image-worker/build/
