@@ -14,6 +14,7 @@ from image_worker.handler import (
     lambda_handler,
     parse_crop_job,
 )
+from lambda_function import lambda_handler as default_lambda_handler
 
 
 def test_parse_crop_job_accepts_expected_payload():
@@ -163,6 +164,10 @@ def test_lambda_handler_returns_partial_batch_failures(monkeypatch):
 
     assert got == {"batchItemFailures": [{"itemIdentifier": "msg-2"}]}
     assert fake_worker.handled_bodies == ["ok", "bad"]
+
+
+def test_default_lambda_handler_entrypoint_matches_worker_handler():
+    assert default_lambda_handler is lambda_handler
 
 
 class FakeBody:
