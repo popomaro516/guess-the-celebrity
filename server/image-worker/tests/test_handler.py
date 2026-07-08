@@ -218,7 +218,7 @@ class FakeDynamoDB:
         ExpressionAttributeNames,
         ExpressionAttributeValues,
     ):
-        quiz_id = Key["PK"]["S"].removeprefix("QUIZ#")
+        quiz_id = Key["quiz_id"]["S"]
         status = ExpressionAttributeValues[":status"]["S"]
         self.status_updates.append((quiz_id, status))
         return {}

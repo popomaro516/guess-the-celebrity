@@ -22,9 +22,6 @@ func (r *ImageRepository) Save(ctx context.Context, img image.Image) error {
 	_, err := r.client.PutItem(ctx, &awsdynamodb.PutItemInput{
 		TableName: aws.String(r.tableName),
 		Item: map[string]types.AttributeValue{
-			"PK":                 stringAttr(imagePK(img.ID)),
-			"SK":                 stringAttr(metadataSK),
-			"type":               stringAttr(imageType),
 			"image_id":           stringAttr(img.ID),
 			"owner_user_id":      stringAttr(img.OwnerUserID),
 			"original_image_key": stringAttr(img.OriginalImageKey),
@@ -42,14 +39,13 @@ func (r *ImageRepository) FindByID(ctx context.Context, id string) (image.Image,
 	out, err := r.client.GetItem(ctx, &awsdynamodb.GetItemInput{
 		TableName: aws.String(r.tableName),
 		Key: map[string]types.AttributeValue{
-			"PK": stringAttr(imagePK(id)),
-			"SK": stringAttr(metadataSK),
+			"image_id": stringAttr(id),
 		},
 	})
 	if err != nil {
 		return image.Image{}, err
 	}
-	if len(out.Item) == 0 || getString(out.Item, "type") != imageType {
+	if len(out.Item) == 0 {
 		return image.Image{}, image.ErrImageNotFound
 	}
 	return image.Image{

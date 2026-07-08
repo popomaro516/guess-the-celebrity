@@ -9,25 +9,8 @@ import (
 )
 
 const (
-	metadataSK   = "METADATA"
-	imageType    = "IMAGE"
-	quizType     = "QUIZ"
-	attemptType  = "ATTEMPT"
-	publicFeedPK = "QUIZ_FEED#PUBLIC"
-	feedLimit    = int32(10)
+	publicFeedID = "random"
 )
-
-func imagePK(id string) string {
-	return "IMAGE#" + id
-}
-
-func quizPK(id string) string {
-	return "QUIZ#" + id
-}
-
-func attemptSK(id string) string {
-	return "ATTEMPT#" + id
-}
 
 func stringAttr(value string) types.AttributeValue {
 	return &types.AttributeValueMemberS{Value: value}
@@ -35,10 +18,6 @@ func stringAttr(value string) types.AttributeValue {
 
 func numberAttr(value string) types.AttributeValue {
 	return &types.AttributeValueMemberN{Value: value}
-}
-
-func boolAttr(value bool) types.AttributeValue {
-	return &types.AttributeValueMemberBOOL{Value: value}
 }
 
 func timeAttr(value time.Time) types.AttributeValue {
@@ -93,18 +72,22 @@ func getTime(item map[string]types.AttributeValue, name string) time.Time {
 }
 
 func getChoices(item map[string]types.AttributeValue, name string) []string {
+	return getStrings(item, name)
+}
+
+func getStrings(item map[string]types.AttributeValue, name string) []string {
 	value, ok := item[name].(*types.AttributeValueMemberL)
 	if !ok {
 		return nil
 	}
-	choices := make([]string, 0, len(value.Value))
+	values := make([]string, 0, len(value.Value))
 	for _, entry := range value.Value {
-		choice, ok := entry.(*types.AttributeValueMemberS)
+		value, ok := entry.(*types.AttributeValueMemberS)
 		if ok {
-			choices = append(choices, choice.Value)
+			values = append(values, value.Value)
 		}
 	}
-	return choices
+	return values
 }
 
 func quizCrop(item map[string]types.AttributeValue) quiz.Crop {

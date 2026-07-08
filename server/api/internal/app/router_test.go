@@ -107,7 +107,6 @@ func testRouter() http.Handler {
 	store := localdb.NewStore()
 	imageRepo := localdb.NewImageRepository(store)
 	quizRepo := localdb.NewQuizRepository(store)
-	attemptRepo := localdb.NewAttemptRepository(store)
 	ids := &sequenceIDs{}
 	clock := fixedClock{}
 	queue := localqueue.NewCropJobQueue()
@@ -117,7 +116,7 @@ func testRouter() http.Handler {
 	return app.NewRouter(app.Dependencies{
 		UploadService:  upload.NewService(imageRepo, presigner, objects, ids, clock),
 		QuizService:    quiz.NewService(quizRepo, quizRepo, imageRepo, queue, ids, clock),
-		AttemptService: attempt.NewService(attemptRepo, quizRepo, imageRepo, ids, clock),
+		AttemptService: attempt.NewService(quizRepo, imageRepo),
 		BaseURL:        "http://localhost:8080",
 		AssetBaseURL:   "http://localhost:8080",
 	})

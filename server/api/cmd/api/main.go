@@ -41,20 +41,24 @@ func main() {
 	var imageRepo upload.ImageRepository
 	var quizRepo quiz.Repository
 	var publicFeedRepo quiz.PublicFeedRepository
-	var attemptRepo attempt.Repository
-	if cfg.DynamoDBTableName == "" {
+	if cfg.HasDynamoDBConfig() && !cfg.HasCompleteDynamoDBConfig() {
+		logger.Error("all DynamoDB table names must be configured")
+		os.Exit(1)
+	}
+	if !cfg.HasDynamoDBConfig() {
 		localQuizRepo := localdb.NewQuizRepository(store)
 		imageRepo = localdb.NewImageRepository(store)
 		quizRepo = localQuizRepo
 		publicFeedRepo = localQuizRepo
-		attemptRepo = localdb.NewAttemptRepository(store)
 	} else {
 		dynamoClient := awsdynamodb.NewFromConfig(awsCfg)
-		dynamoQuizRepo := platformdynamodb.NewQuizRepository(dynamoClient, cfg.DynamoDBTableName)
-		imageRepo = platformdynamodb.NewImageRepository(dynamoClient, cfg.DynamoDBTableName)
+		dynamoQuizRepo := platformdynamodb.NewQuizRepository(dynamoClient, cfg.DynamoDBQuizzesTableName)
+		imageRepo = platformdynamodb.NewImageRepository(dynamoClient, cfg.DynamoDBImagesTableName)
 		quizRepo = dynamoQuizRepo
-		publicFeedRepo = dynamoQuizRepo
-		attemptRepo = platformdynamodb.NewAttemptRepository(dynamoClient, cfg.DynamoDBTableName)
+		publicFeedRepo = platformdynamodb.NewPublicFeedRepository(
+			dynamoClient,
+			cfg.DynamoDBQuizFeedTableName,
+		)
 	}
 
 	ids := idgen.New()
@@ -65,7 +69,7 @@ func main() {
 	router := app.NewRouter(app.Dependencies{
 		UploadService:  upload.NewService(imageRepo, presigner, objects, ids, realClock),
 		QuizService:    quiz.NewService(quizRepo, publicFeedRepo, imageRepo, queue, ids, realClock),
-		AttemptService: attempt.NewService(attemptRepo, quizRepo, imageRepo, ids, realClock),
+		AttemptService: attempt.NewService(quizRepo, imageRepo),
 		BaseURL:        cfg.BaseURL,
 		AssetBaseURL:   cfg.AssetBaseURL,
 		Logger:         logger,
@@ -75,7 +79,7 @@ func main() {
 		"http_addr", cfg.HTTPAddr,
 		"aws_region", cfg.AWSRegion,
 		"s3_configured", cfg.S3Bucket != "",
-		"dynamodb_configured", cfg.DynamoDBTableName != "",
+		"dynamodb_configured", cfg.HasCompleteDynamoDBConfig(),
 		"crop_queue_configured", cfg.CropQueueURL != "",
 		"asset_base_url_configured", cfg.AssetBaseURL != "",
 	)
@@ -86,7 +90,7 @@ func main() {
 }
 
 func loadAWSConfig(ctx context.Context, cfg config.Config) aws.Config {
-	if cfg.S3Bucket == "" && cfg.DynamoDBTableName == "" && cfg.CropQueueURL == "" {
+	if cfg.S3Bucket == "" && !cfg.HasDynamoDBConfig() && cfg.CropQueueURL == "" {
 		return aws.Config{}
 	}
 

@@ -22,9 +22,6 @@ func (r *QuizRepository) Save(ctx context.Context, q quiz.Quiz) error {
 	_, err := r.client.PutItem(ctx, &awsdynamodb.PutItemInput{
 		TableName: aws.String(r.tableName),
 		Item: map[string]types.AttributeValue{
-			"PK":                stringAttr(quizPK(q.ID)),
-			"SK":                stringAttr(metadataSK),
-			"type":              stringAttr(quizType),
 			"quiz_id":           stringAttr(q.ID),
 			"creator_user_id":   stringAttr(q.CreatorUserID),
 			"image_id":          stringAttr(q.ImageID),
@@ -49,47 +46,16 @@ func (r *QuizRepository) FindByID(ctx context.Context, id string) (quiz.Quiz, er
 	out, err := r.client.GetItem(ctx, &awsdynamodb.GetItemInput{
 		TableName: aws.String(r.tableName),
 		Key: map[string]types.AttributeValue{
-			"PK": stringAttr(quizPK(id)),
-			"SK": stringAttr(metadataSK),
+			"quiz_id": stringAttr(id),
 		},
 	})
 	if err != nil {
 		return quiz.Quiz{}, err
 	}
-	if len(out.Item) == 0 || getString(out.Item, "type") != quizType {
+	if len(out.Item) == 0 {
 		return quiz.Quiz{}, quiz.ErrQuizNotFound
 	}
 	return quizFromItem(out.Item), nil
-}
-
-func (r *QuizRepository) FindPublicQuizCandidateIDs(ctx context.Context, limit int) ([]string, error) {
-	if limit <= 0 {
-		return nil, nil
-	}
-	out, err := r.client.Query(ctx, &awsdynamodb.QueryInput{
-		TableName:              aws.String(r.tableName),
-		KeyConditionExpression: aws.String("PK = :pk"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk": stringAttr(publicFeedPK),
-		},
-		Limit:            aws.Int32(int32(limit)),
-		ScanIndexForward: aws.Bool(true),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	quizIDs := make([]string, 0, len(out.Items))
-	for _, item := range out.Items {
-		if getString(item, "type") != "QUIZ_FEED_ITEM" {
-			continue
-		}
-		quizID := getString(item, "quiz_id")
-		if quizID != "" {
-			quizIDs = append(quizIDs, quizID)
-		}
-	}
-	return quizIDs, nil
 }
 
 func (r *QuizRepository) Update(ctx context.Context, q quiz.Quiz) error {
