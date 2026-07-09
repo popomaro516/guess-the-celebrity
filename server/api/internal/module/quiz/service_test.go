@@ -159,36 +159,8 @@ func TestListOwnedReturnsOnlyCreatorsQuizzesNewestFirst(t *testing.T) {
 	}
 }
 
-func TestRandomPublishedReturnsFeedProjectionWithoutLoadingQuiz(t *testing.T) {
-	repo := newFakeRepository()
-	feed := &fakePublicFeedRepository{
-		quizzes: []quiz.PublicQuiz{
-			{
-				ID:              "quiz_feed",
-				Question:        "feedの問題",
-				CroppedImageKey: "quizzes/quiz_feed/crop.webp",
-				Choices:         []string{"A", "B", "C", "D"},
-				Difficulty:      quiz.DifficultyHard,
-			},
-		},
-	}
-	svc := quiz.NewService(repo, feed, newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
-
-	got, err := svc.RandomPublished(context.Background())
-	if err != nil {
-		t.Fatalf("RandomPublished returned error: %v", err)
-	}
-	if got.ID != "quiz_feed" || got.Question != "feedの問題" {
-		t.Fatalf("unexpected public quiz: %+v", got)
-	}
-	if repo.findByIDCalls != 0 {
-		t.Fatalf("FindByID calls = %d, want 0", repo.findByIDCalls)
-	}
-}
-
 type fakeRepository struct {
-	quizzes       map[string]quiz.Quiz
-	findByIDCalls int
+	quizzes map[string]quiz.Quiz
 }
 
 func newFakeRepository() *fakeRepository {
@@ -205,7 +177,6 @@ func (r *fakeRepository) save(q quiz.Quiz) {
 }
 
 func (r *fakeRepository) FindByID(_ context.Context, id string) (quiz.Quiz, error) {
-	r.findByIDCalls++
 	q, ok := r.quizzes[id]
 	if !ok {
 		return quiz.Quiz{}, quiz.ErrQuizNotFound
@@ -223,39 +194,22 @@ func (r *fakeRepository) FindByCreatorUserID(_ context.Context, creatorUserID st
 	return quizzes, nil
 }
 
-func (r *fakeRepository) FindPublicQuizCandidates(_ context.Context, limit int) ([]quiz.PublicQuiz, error) {
-	quizzes := make([]quiz.PublicQuiz, 0, limit)
+func (r *fakeRepository) FindPublicQuizCandidateIDs(_ context.Context, limit int) ([]string, error) {
+	ids := make([]string, 0, limit)
 	for _, q := range r.quizzes {
 		if q.Status == quiz.StatusPublished {
-			quizzes = append(quizzes, quiz.PublicQuiz{
-				ID:              q.ID,
-				Question:        q.Question,
-				CroppedImageKey: q.CroppedImageKey,
-				Choices:         append([]string(nil), q.Choices...),
-				Difficulty:      q.Difficulty,
-			})
-			if len(quizzes) == limit {
-				return quizzes, nil
+			ids = append(ids, q.ID)
+			if len(ids) == limit {
+				return ids, nil
 			}
 		}
 	}
-	return quizzes, nil
+	return ids, nil
 }
 
 func (r *fakeRepository) Update(_ context.Context, q quiz.Quiz) error {
 	r.quizzes[q.ID] = q
 	return nil
-}
-
-type fakePublicFeedRepository struct {
-	quizzes []quiz.PublicQuiz
-}
-
-func (r *fakePublicFeedRepository) FindPublicQuizCandidates(_ context.Context, limit int) ([]quiz.PublicQuiz, error) {
-	if len(r.quizzes) < limit {
-		limit = len(r.quizzes)
-	}
-	return append([]quiz.PublicQuiz(nil), r.quizzes[:limit]...), nil
 }
 
 type fakeImageRepository struct {
