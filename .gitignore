@@ -116,8 +116,9 @@ dist
 # DynamoDB Local files
 .dynamodb/
 
-# Project planning docs are local-only for now.
-docs/
+# Project planning docs are local-only except for the product specification.
+docs/*
+!docs/spec.md
 
 # Firebase cache directory
 .firebase/
