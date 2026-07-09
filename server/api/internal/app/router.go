@@ -129,6 +129,10 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		})
 	})
 
+	router.GET("/quizzes/mine", deps.AuthMiddleware, func(c *gin.Context) {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented"})
+	})
+
 	router.POST("/quizzes/:quiz_id/publish", deps.AuthMiddleware, func(c *gin.Context) {
 		principal, ok := authenticatedPrincipal(c, logger)
 		if !ok {

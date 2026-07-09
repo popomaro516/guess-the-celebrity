@@ -140,6 +140,35 @@ func TestAuthoringRoutesRequireAuthentication(t *testing.T) {
 	}
 }
 
+func TestMyQuizzesRouteRequiresAuthentication(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := app.NewRouter(app.Dependencies{
+		AuthMiddleware: auth.Require(rejectTokens{}),
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/quizzes/mine", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("GET /quizzes/mine status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestMyQuizzesRouteIsNotImplemented(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router, _ := newTestRouter(auth.Require(acceptTokens{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/quizzes/mine", nil)
+	req.Header.Set("Authorization", "Bearer valid-token")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotImplemented {
+		t.Fatalf("GET /quizzes/mine status = %d, want %d", rec.Code, http.StatusNotImplemented)
+	}
+}
+
 func TestPublishRejectsUserWhoIsNotCreator(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router, quizRepo := newTestRouter(auth.Require(acceptTokens{}))
