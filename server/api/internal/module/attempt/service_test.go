@@ -9,7 +9,7 @@ import (
 	"github.com/tomy/guess-the-celebrity/server/api/internal/module/quiz"
 )
 
-func TestAnswerHidesCorrectAnswerWhenWrong(t *testing.T) {
+func TestAnswerRevealsAnswerAndOriginalImageWhenWrong(t *testing.T) {
 	quizzes := newFakeQuizRepository()
 	images := newFakeImageRepository()
 	svc := attempt.NewService(quizzes, images)
@@ -34,8 +34,11 @@ func TestAnswerHidesCorrectAnswerWhenWrong(t *testing.T) {
 	if got.Correct {
 		t.Fatal("Correct = true, want false")
 	}
-	if got.CorrectAnswer != "" {
-		t.Fatalf("CorrectAnswer = %q, want hidden", got.CorrectAnswer)
+	if got.CorrectAnswer != "cat" {
+		t.Fatalf("CorrectAnswer = %q, want cat", got.CorrectAnswer)
+	}
+	if got.OriginalImageKey != "originals/anonymous/img_123/source.jpg" {
+		t.Fatalf("OriginalImageKey = %q", got.OriginalImageKey)
 	}
 }
 

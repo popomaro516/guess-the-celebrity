@@ -225,8 +225,10 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		)
 
 		response := gin.H{"correct": out.Correct}
-		if out.Correct {
+		if out.CorrectAnswer != "" {
 			response["correct_answer"] = out.CorrectAnswer
+		}
+		if out.OriginalImageKey != "" {
 			response["original_image_url"] = assetURL(deps.AssetBaseURL, out.OriginalImageKey)
 		}
 		c.JSON(http.StatusOK, response)
