@@ -1,8 +1,11 @@
 package feed
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -93,6 +96,44 @@ func TestRefreshWritesEmptyFeed(t *testing.T) {
 	}
 	if got := listValue(client.putInputs[0].Item, "quizzes"); len(got) != 0 {
 		t.Fatalf("len(quizzes) = %d, want 0", len(got))
+	}
+}
+
+func TestRefreshLogsStructuredSummary(t *testing.T) {
+	var logOutput bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logOutput, nil))
+	client := &fakeDynamoDB{
+		queryOutput: &dynamodb.QueryOutput{
+			Items: []map[string]types.AttributeValue{
+				quizItem("quiz_2", "二問目", []string{"A", "B", "C", "D"}, "hard", "quizzes/quiz_2/crop.webp"),
+			},
+		},
+	}
+	worker, err := New(client, Config{
+		QuizzesTableName: "quizzes",
+		FeedTableName:    "feed",
+		Logger:           logger,
+	}, func() time.Time {
+		return time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
+	})
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+
+	_, err = worker.Refresh(context.Background())
+	if err != nil {
+		t.Fatalf("Refresh returned error: %v", err)
+	}
+
+	logs := logOutput.String()
+	if !strings.Contains(logs, `"msg":"feed refresh completed"`) {
+		t.Fatalf("completion log missing: %s", logs)
+	}
+	if !strings.Contains(logs, `"quiz_count":1`) {
+		t.Fatalf("quiz_count missing from logs: %s", logs)
+	}
+	if !strings.Contains(logs, `"feed_id":"random"`) {
+		t.Fatalf("feed_id missing from logs: %s", logs)
 	}
 }
 

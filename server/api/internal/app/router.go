@@ -1,6 +1,8 @@
 package app
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"io"
 	"log/slog"
@@ -33,7 +35,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	}
 
 	router := gin.New()
-	router.Use(requestLogger(logger), panicRecovery(logger))
+	router.Use(requestMetadata(), requestLogger(logger), panicRecovery(logger))
 
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
@@ -48,7 +50,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 			ContentType string `json:"content_type" binding:"required"`
 			Size        int64  `json:"size" binding:"required"`
 		}
-		if !bindJSON(c, &req) {
+		if !bindJSON(c, logger, &req) {
 			return
 		}
 		out, err := deps.UploadService.Presign(c.Request.Context(), upload.PresignInput{
@@ -60,6 +62,13 @@ func NewRouter(deps Dependencies) *gin.Engine {
 			respondError(c, logger, err)
 			return
 		}
+		logEvent(c, logger, slog.LevelInfo, "upload presigned",
+			slog.String("image_id", out.ImageID),
+			slog.String("object_key", out.ObjectKey),
+			slog.String("content_type", req.ContentType),
+			slog.Int64("size_bytes", req.Size),
+			slog.Int("expires_in_seconds", out.ExpiresIn),
+		)
 		c.JSON(http.StatusOK, gin.H{
 			"image_id":   out.ImageID,
 			"upload_url": out.UploadURL,
@@ -74,6 +83,10 @@ func NewRouter(deps Dependencies) *gin.Engine {
 			respondError(c, logger, err)
 			return
 		}
+		logEvent(c, logger, slog.LevelInfo, "upload completed",
+			slog.String("image_id", img.ID),
+			slog.String("status", string(img.Status)),
+		)
 		c.JSON(http.StatusOK, gin.H{
 			"image_id": img.ID,
 			"status":   img.Status,
@@ -93,7 +106,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 			Difficulty quiz.Difficulty `json:"difficulty" binding:"required"`
 			Crop       quiz.Crop       `json:"crop" binding:"required"`
 		}
-		if !bindJSON(c, &req) {
+		if !bindJSON(c, logger, &req) {
 			return
 		}
 		out, err := deps.QuizService.Create(c.Request.Context(), principal.Subject, quiz.CreateInput{
@@ -108,6 +121,14 @@ func NewRouter(deps Dependencies) *gin.Engine {
 			respondError(c, logger, err)
 			return
 		}
+		logEvent(c, logger, slog.LevelInfo, "quiz created",
+			slog.String("quiz_id", out.ID),
+			slog.String("image_id", req.ImageID),
+			slog.String("difficulty", string(req.Difficulty)),
+			slog.Int("choices_count", len(req.Choices)),
+			slog.String("creator_user_id", principal.Subject),
+			slog.String("status", string(out.Status)),
+		)
 		c.JSON(http.StatusCreated, gin.H{
 			"quiz_id": out.ID,
 			"status":  out.Status,
@@ -120,6 +141,10 @@ func NewRouter(deps Dependencies) *gin.Engine {
 			respondError(c, logger, err)
 			return
 		}
+		logEvent(c, logger, slog.LevelInfo, "random quiz served",
+			slog.String("quiz_id", out.ID),
+			slog.String("difficulty", string(out.Difficulty)),
+		)
 		c.JSON(http.StatusOK, gin.H{
 			"quiz_id":           out.ID,
 			"question":          out.Question,
@@ -139,6 +164,9 @@ func NewRouter(deps Dependencies) *gin.Engine {
 			respondError(c, logger, err)
 			return
 		}
+		logEvent(c, logger, slog.LevelInfo, "owned quizzes listed",
+			slog.Int("quiz_count", len(quizzes)),
+		)
 		response := make([]gin.H, 0, len(quizzes))
 		for _, ownedQuiz := range quizzes {
 			item := gin.H{
@@ -166,6 +194,10 @@ func NewRouter(deps Dependencies) *gin.Engine {
 			respondError(c, logger, err)
 			return
 		}
+		logEvent(c, logger, slog.LevelInfo, "quiz published",
+			slog.String("quiz_id", out.ID),
+			slog.String("status", string(out.Status)),
+		)
 		c.JSON(http.StatusOK, gin.H{
 			"quiz_id": out.ID,
 			"status":  out.Status,
@@ -176,7 +208,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		var req struct {
 			Answer string `json:"answer" binding:"required"`
 		}
-		if !bindJSON(c, &req) {
+		if !bindJSON(c, logger, &req) {
 			return
 		}
 		out, err := deps.AttemptService.Answer(c.Request.Context(), attempt.AnswerInput{
@@ -187,6 +219,10 @@ func NewRouter(deps Dependencies) *gin.Engine {
 			respondError(c, logger, err)
 			return
 		}
+		logEvent(c, logger, slog.LevelInfo, "quiz answered",
+			slog.String("quiz_id", c.Param("quiz_id")),
+			slog.Bool("correct", out.Correct),
+		)
 
 		response := gin.H{"correct": out.Correct}
 		if out.Correct {
@@ -214,8 +250,12 @@ func authenticatedPrincipal(c *gin.Context, logger *slog.Logger) (auth.Principal
 	return auth.Principal{}, false
 }
 
-func bindJSON(c *gin.Context, dst any) bool {
+func bindJSON(c *gin.Context, logger *slog.Logger, dst any) bool {
 	if err := c.ShouldBindJSON(dst); err != nil {
+		logEvent(c, logger, slog.LevelWarn, "request validation failed",
+			slog.Int("status", http.StatusBadRequest),
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return false
 	}
@@ -231,19 +271,27 @@ func respondError(c *gin.Context, logger *slog.Logger, err error) {
 		errors.Is(err, quiz.ErrQuizNotReady),
 		errors.Is(err, attempt.ErrQuizNotPublished),
 		errors.Is(err, upload.ErrUploadObjectNotFound):
+		logEvent(c, logger, slog.LevelWarn, "request failed",
+			slog.Int("status", http.StatusBadRequest),
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, image.ErrImageNotFound), errors.Is(err, quiz.ErrQuizNotFound):
+		logEvent(c, logger, slog.LevelWarn, "request failed",
+			slog.Int("status", http.StatusNotFound),
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, quiz.ErrPublishForbidden):
+		logEvent(c, logger, slog.LevelWarn, "request failed",
+			slog.Int("status", http.StatusForbidden),
+			slog.Any("error", err),
+		)
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 	default:
-		logger.ErrorContext(c.Request.Context(), "request failed",
-			"error", err,
-			"method", c.Request.Method,
-			"path", c.Request.URL.Path,
-			"route", c.FullPath(),
-			"status", http.StatusInternalServerError,
-			"request_id", requestID(c),
+		logEvent(c, logger, slog.LevelError, "request failed",
+			slog.Int("status", http.StatusInternalServerError),
+			slog.Any("error", err),
 		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 	}
@@ -275,15 +323,63 @@ func requestLogger(logger *slog.Logger) gin.HandlerFunc {
 			slog.Int64("duration_ms", time.Since(start).Milliseconds()),
 			slog.String("client_ip", c.ClientIP()),
 			slog.String("request_id", requestID(c)),
+			slog.String("principal_subject", principalSubject(c)),
+			slog.String("user_agent", c.Request.UserAgent()),
 		)
 	}
 }
 
+const requestIDKey = "request.id"
+
+func requestMetadata() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		requestID := requestID(c)
+		if requestID == "" {
+			requestID = newRequestID()
+		}
+		c.Set(requestIDKey, requestID)
+		c.Header("X-Request-Id", requestID)
+		c.Next()
+	}
+}
+
 func requestID(c *gin.Context) string {
+	if value, ok := c.Get(requestIDKey); ok {
+		if requestID, ok := value.(string); ok && requestID != "" {
+			return requestID
+		}
+	}
 	if value := c.GetHeader("X-Request-Id"); value != "" {
 		return value
 	}
 	return c.GetHeader("X-Amzn-Trace-Id")
+}
+
+func newRequestID() string {
+	var bytes [16]byte
+	if _, err := rand.Read(bytes[:]); err != nil {
+		return time.Now().UTC().Format("20060102T150405.000000000")
+	}
+	return hex.EncodeToString(bytes[:])
+}
+
+func principalSubject(c *gin.Context) string {
+	principal, ok := auth.PrincipalFromContext(c)
+	if !ok || principal.Subject == "" {
+		return "anonymous"
+	}
+	return principal.Subject
+}
+
+func logEvent(c *gin.Context, logger *slog.Logger, level slog.Level, msg string, attrs ...slog.Attr) {
+	baseAttrs := []slog.Attr{
+		slog.String("method", c.Request.Method),
+		slog.String("path", c.Request.URL.Path),
+		slog.String("route", c.FullPath()),
+		slog.String("request_id", requestID(c)),
+		slog.String("principal_subject", principalSubject(c)),
+	}
+	logger.LogAttrs(c.Request.Context(), level, msg, append(baseAttrs, attrs...)...)
 }
 
 func panicRecovery(logger *slog.Logger) gin.HandlerFunc {
