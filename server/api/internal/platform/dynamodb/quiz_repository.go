@@ -58,6 +58,27 @@ func (r *QuizRepository) FindByID(ctx context.Context, id string) (quiz.Quiz, er
 	return quizFromItem(out.Item), nil
 }
 
+func (r *QuizRepository) FindByCreatorUserID(ctx context.Context, creatorUserID string) ([]quiz.Quiz, error) {
+	paginator := awsdynamodb.NewScanPaginator(r.client, &awsdynamodb.ScanInput{
+		TableName:        aws.String(r.tableName),
+		FilterExpression: aws.String("creator_user_id = :creator_user_id"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":creator_user_id": stringAttr(creatorUserID),
+		},
+	})
+	quizzes := make([]quiz.Quiz, 0)
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range out.Items {
+			quizzes = append(quizzes, quizFromItem(item))
+		}
+	}
+	return quizzes, nil
+}
+
 func (r *QuizRepository) Update(ctx context.Context, q quiz.Quiz) error {
 	return r.Save(ctx, q)
 }

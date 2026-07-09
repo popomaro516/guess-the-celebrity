@@ -276,7 +276,33 @@ Response: `200 OK`
 }
 ```
 
-### 9.7 ランダムクイズ取得
+### 9.7 自分のクイズ一覧
+
+#### `GET /quizzes/mine`
+
+認証: 必須
+
+作成日時の新しい順で、認証済みユーザーが作成したクイズのみを返す。
+`cropped_image_url`はステータスが`ready`または`published`の場合だけ返す。
+
+Response: `200 OK`
+
+```json
+{
+  "quizzes": [
+    {
+      "quiz_id": "quiz_123",
+      "question": "この画像に写っているものは何？",
+      "difficulty": "normal",
+      "status": "ready",
+      "cropped_image_url": "https://...",
+      "created_at": "2026-07-09T00:00:00Z"
+    }
+  ]
+}
+```
+
+### 9.8 ランダムクイズ取得
 
 #### `GET /quizzes/random`
 
@@ -294,7 +320,7 @@ Response: `200 OK`
 }
 ```
 
-### 9.8 クイズ回答
+### 9.9 クイズ回答
 
 #### `POST /quizzes/{quiz_id}/answer`
 

@@ -130,7 +130,30 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	})
 
 	router.GET("/quizzes/mine", deps.AuthMiddleware, func(c *gin.Context) {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented"})
+		principal, ok := authenticatedPrincipal(c, logger)
+		if !ok {
+			return
+		}
+		quizzes, err := deps.QuizService.ListOwned(c.Request.Context(), principal.Subject)
+		if err != nil {
+			respondError(c, logger, err)
+			return
+		}
+		response := make([]gin.H, 0, len(quizzes))
+		for _, ownedQuiz := range quizzes {
+			item := gin.H{
+				"quiz_id":    ownedQuiz.ID,
+				"question":   ownedQuiz.Question,
+				"difficulty": ownedQuiz.Difficulty,
+				"status":     ownedQuiz.Status,
+				"created_at": ownedQuiz.CreatedAt,
+			}
+			if ownedQuiz.Status == quiz.StatusReady || ownedQuiz.Status == quiz.StatusPublished {
+				item["cropped_image_url"] = assetURL(deps.AssetBaseURL, ownedQuiz.CroppedImageKey)
+			}
+			response = append(response, item)
+		}
+		c.JSON(http.StatusOK, gin.H{"quizzes": response})
 	})
 
 	router.POST("/quizzes/:quiz_id/publish", deps.AuthMiddleware, func(c *gin.Context) {

@@ -9,6 +9,7 @@ import (
 type Repository interface {
 	Save(ctx context.Context, q Quiz) error
 	FindByID(ctx context.Context, id string) (Quiz, error)
+	FindByCreatorUserID(ctx context.Context, creatorUserID string) ([]Quiz, error)
 	Update(ctx context.Context, q Quiz) error
 }
 
