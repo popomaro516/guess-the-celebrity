@@ -188,6 +188,21 @@ func TestAuthoringRoutesRequireAuthentication(t *testing.T) {
 	}
 }
 
+func TestDeleteQuizRouteRequiresAuthentication(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := app.NewRouter(app.Dependencies{
+		AuthMiddleware: auth.Require(rejectTokens{}),
+	})
+
+	req := httptest.NewRequest(http.MethodDelete, "/quizzes/quiz_1", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("DELETE /quizzes/quiz_1 status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
 func TestMyQuizzesRouteRequiresAuthentication(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := app.NewRouter(app.Dependencies{
@@ -333,6 +348,57 @@ func TestPublishRejectsUserWhoIsNotCreator(t *testing.T) {
 	}
 }
 
+func TestDeleteQuizRouteRemovesAuthenticatedUsersQuiz(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router, quizRepo := newTestRouter(auth.Require(acceptTokens{}))
+
+	presignBody := postJSON(t, router, "/uploads/presign", map[string]any{
+		"filename":     "cat.jpg",
+		"content_type": "image/jpeg",
+		"size":         2048,
+	}, http.StatusOK)
+	imageID := presignBody["image_id"].(string)
+	postJSON(t, router, "/images/"+imageID+"/complete", nil, http.StatusOK)
+
+	quizBody := postJSON(t, router, "/quizzes", map[string]any{
+		"image_id":   imageID,
+		"question":   "これは何の動物？",
+		"answer":     "cat",
+		"choices":    []string{"cat", "dog", "fox", "rabbit"},
+		"difficulty": "normal",
+		"crop": map[string]float64{
+			"x": 0.24, "y": 0.18, "width": 0.32, "height": 0.28,
+		},
+	}, http.StatusCreated)
+	quizID := quizBody["quiz_id"].(string)
+
+	deleteNoContent(t, router, "/quizzes/"+quizID, http.StatusNoContent)
+	if _, err := quizRepo.FindByID(context.Background(), quizID); !errors.Is(err, quiz.ErrQuizNotFound) {
+		t.Fatalf("FindByID err = %v, want %v", err, quiz.ErrQuizNotFound)
+	}
+}
+
+func TestDeleteQuizRouteRejectsUserWhoIsNotCreator(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router, quizRepo := newTestRouter(auth.Require(acceptTokens{}))
+	if err := quizRepo.Save(context.Background(), quiz.Quiz{
+		ID:              "quiz_123",
+		CreatorUserID:   "owner-123",
+		ImageID:         "img_123",
+		CroppedImageKey: "quizzes/quiz_123/crop.webp",
+	}); err != nil {
+		t.Fatalf("Save returned error: %v", err)
+	}
+
+	body := deleteJSON(t, router, "/quizzes/quiz_123", http.StatusForbidden)
+	if body["error"] != "forbidden" {
+		t.Fatalf("error = %q, want forbidden", body["error"])
+	}
+	if _, err := quizRepo.FindByID(context.Background(), "quiz_123"); err != nil {
+		t.Fatalf("FindByID returned error: %v", err)
+	}
+}
+
 func TestRouterAssignsRequestIDAndLogsPrincipalSubject(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	var logOutput bytes.Buffer
@@ -428,6 +494,36 @@ func postJSON(t *testing.T, handler http.Handler, path string, body any, wantSta
 	return response
 }
 
+func deleteNoContent(t *testing.T, handler http.Handler, path string, wantStatus int) {
+	t.Helper()
+
+	req := httptest.NewRequest(http.MethodDelete, path, nil)
+	req.Header.Set("Authorization", "Bearer valid-token")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != wantStatus {
+		t.Fatalf("DELETE %s status = %d, want %d, body = %s", path, rec.Code, wantStatus, rec.Body.String())
+	}
+}
+
+func deleteJSON(t *testing.T, handler http.Handler, path string, wantStatus int) map[string]any {
+	t.Helper()
+
+	req := httptest.NewRequest(http.MethodDelete, path, nil)
+	req.Header.Set("Authorization", "Bearer valid-token")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != wantStatus {
+		t.Fatalf("DELETE %s status = %d, want %d, body = %s", path, rec.Code, wantStatus, rec.Body.String())
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json decode: %v", err)
+	}
+	return response
+}
+
 func testRouter() http.Handler {
 	router, _ := newTestRouter(auth.Disabled())
 	return router
@@ -449,7 +545,7 @@ func newTestRouterWithLogger(authMiddleware gin.HandlerFunc, logger *slog.Logger
 
 	router := app.NewRouter(app.Dependencies{
 		UploadService:  upload.NewService(imageRepo, presigner, objects, ids, clock),
-		QuizService:    quiz.NewService(quizRepo, quizRepo, imageRepo, queue, ids, clock),
+		QuizService:    quiz.NewService(quizRepo, quizRepo, imageRepo, objects, queue, ids, clock),
 		AttemptService: attempt.NewService(quizRepo, imageRepo),
 		AuthMiddleware: authMiddleware,
 		BaseURL:        "http://localhost:8080",

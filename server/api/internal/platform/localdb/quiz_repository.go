@@ -67,3 +67,12 @@ func (r *QuizRepository) FindPublicQuizCandidates(_ context.Context, limit int) 
 func (r *QuizRepository) Update(ctx context.Context, q quiz.Quiz) error {
 	return r.Save(ctx, q)
 }
+
+func (r *QuizRepository) Delete(_ context.Context, quizID string) error {
+	r.store.delete(quizzesCollection, quizID)
+	return nil
+}
+
+func (r *QuizRepository) Remove(_ context.Context, _ string) error {
+	return nil
+}

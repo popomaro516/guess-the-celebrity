@@ -33,3 +33,11 @@ func (s *ObjectStore) Exists(ctx context.Context, objectKey string) (bool, error
 	}
 	return false, err
 }
+
+func (s *ObjectStore) Delete(ctx context.Context, objectKey string) error {
+	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(objectKey),
+	})
+	return err
+}

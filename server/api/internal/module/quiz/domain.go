@@ -12,6 +12,7 @@ var (
 	ErrQuizNotFound     = errors.New("quiz not found")
 	ErrQuizNotReady     = errors.New("quiz is not ready")
 	ErrPublishForbidden = errors.New("quiz publish forbidden")
+	ErrDeleteForbidden  = errors.New("quiz delete forbidden")
 )
 
 type Status string

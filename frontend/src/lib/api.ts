@@ -80,6 +80,9 @@ async function request<T>(
     }
     throw new ApiError(message, response.status);
   }
+  if (response.status === 204) {
+    return undefined as T;
+  }
 
   return response.json() as Promise<T>;
 }
@@ -150,6 +153,14 @@ export function publishQuiz(quizId: string): Promise<{ quiz_id: string; status: 
   return request(
     `/quizzes/${encodeURIComponent(quizId)}/publish`,
     { method: "POST" },
+    true,
+  );
+}
+
+export function deleteQuiz(quizId: string): Promise<void> {
+  return request(
+    `/quizzes/${encodeURIComponent(quizId)}`,
+    { method: "DELETE" },
     true,
   );
 }

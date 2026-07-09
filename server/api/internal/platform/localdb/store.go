@@ -21,6 +21,13 @@ func (s *Store) put(collection, id string, doc any) {
 	s.collections[collection][id] = doc
 }
 
+func (s *Store) delete(collection, id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.collections[collection], id)
+}
+
 func (s *Store) get(collection, id string) (any, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
