@@ -44,24 +44,18 @@ func (r *QuizRepository) FindByCreatorUserID(_ context.Context, creatorUserID st
 	return quizzes, nil
 }
 
-func (r *QuizRepository) FindPublicQuizCandidates(_ context.Context, limit int) ([]quiz.PublicQuiz, error) {
-	quizzes := make([]quiz.PublicQuiz, 0, limit)
+func (r *QuizRepository) FindPublicQuizCandidateIDs(_ context.Context, limit int) ([]string, error) {
+	ids := make([]string, 0, limit)
 	for _, doc := range r.store.list(quizzesCollection) {
 		q, ok := doc.(quiz.Quiz)
 		if ok && q.Status == quiz.StatusPublished {
-			quizzes = append(quizzes, quiz.PublicQuiz{
-				ID:              q.ID,
-				Question:        q.Question,
-				CroppedImageKey: q.CroppedImageKey,
-				Choices:         append([]string(nil), q.Choices...),
-				Difficulty:      q.Difficulty,
-			})
-			if len(quizzes) == limit {
-				return quizzes, nil
+			ids = append(ids, q.ID)
+			if len(ids) == limit {
+				return ids, nil
 			}
 		}
 	}
-	return quizzes, nil
+	return ids, nil
 }
 
 func (r *QuizRepository) Update(ctx context.Context, q quiz.Quiz) error {

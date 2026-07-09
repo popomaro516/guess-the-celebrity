@@ -152,4 +152,3 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 server/image-worker/build/
-server/feed-worker/build/

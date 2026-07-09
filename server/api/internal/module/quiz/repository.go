@@ -14,7 +14,7 @@ type Repository interface {
 }
 
 type PublicFeedRepository interface {
-	FindPublicQuizCandidates(ctx context.Context, limit int) ([]PublicQuiz, error)
+	FindPublicQuizCandidateIDs(ctx context.Context, limit int) ([]string, error)
 }
 
 type ImageRepository interface {
