@@ -7,16 +7,27 @@ export default function AccountPanel() {
   const [username, setUsername] = useState("");
 
   useEffect(() => {
-    currentUser()
-      .then((user) => {
+    let cancelled = false;
+
+    async function loadUser() {
+      try {
+        const user = await currentUser();
+        if (cancelled) return;
         if (!user) {
           setState("signed-out");
           return;
         }
         setUsername(user.signInDetails?.loginId ?? user.username);
         setState("signed-in");
-      })
-      .catch(() => setState("signed-out"));
+      } catch {
+        if (!cancelled) setState("signed-out");
+      }
+    }
+
+    void loadUser();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleLogout() {

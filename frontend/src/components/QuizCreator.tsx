@@ -26,18 +26,28 @@ export default function QuizCreator() {
   const [created, setCreated] = useState<CreatedQuiz | null>(null);
 
   useEffect(() => {
-    currentUser()
-      .then((user) => {
+    let cancelled = false;
+
+    async function requireUser() {
+      try {
+        const user = await currentUser();
+        if (cancelled) return;
         if (!user) {
           window.location.replace("/login/?next=/create/");
           return;
         }
         setAuthState("authenticated");
-      })
-      .catch((caught) => {
+      } catch (caught) {
+        if (cancelled) return;
         setAuthError(authErrorMessage(caught));
         setAuthState("error");
-      });
+      }
+    }
+
+    void requireUser();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
