@@ -83,6 +83,16 @@ func (r *QuizRepository) Update(ctx context.Context, q quiz.Quiz) error {
 	return r.Save(ctx, q)
 }
 
+func (r *QuizRepository) Delete(ctx context.Context, quizID string) error {
+	_, err := r.client.DeleteItem(ctx, &awsdynamodb.DeleteItemInput{
+		TableName: aws.String(r.tableName),
+		Key: map[string]types.AttributeValue{
+			"quiz_id": stringAttr(quizID),
+		},
+	})
+	return err
+}
+
 func quizFromItem(item map[string]types.AttributeValue) quiz.Quiz {
 	return quiz.Quiz{
 		ID:              getString(item, "quiz_id"),

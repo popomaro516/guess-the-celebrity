@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ApiError,
+  deleteQuiz,
   getMyQuizzes,
   publishQuiz,
   type OwnedQuiz,
@@ -19,6 +20,7 @@ export default function MyQuizzes() {
   const [quizzes, setQuizzes] = useState<OwnedQuiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notImplemented, setNotImplemented] = useState(false);
 
@@ -59,6 +61,22 @@ export default function MyQuizzes() {
       setError(caught instanceof Error ? caught.message : "公開できませんでした。");
     } finally {
       setPublishingId(null);
+    }
+  }
+
+  async function remove(quiz: OwnedQuiz) {
+    if (!window.confirm(`「${quiz.question}」を削除しますか？`)) {
+      return;
+    }
+    setDeletingId(quiz.quiz_id);
+    setError(null);
+    try {
+      await deleteQuiz(quiz.quiz_id);
+      setQuizzes((items) => items.filter((item) => item.quiz_id !== quiz.quiz_id));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "削除できませんでした。");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -112,17 +130,28 @@ export default function MyQuizzes() {
                   {new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(new Date(quiz.created_at))}
                 </time>
               )}
-              {quiz.status === "ready" && (
+              <div className="owned-quiz-actions">
+                {quiz.status === "ready" && (
+                  <button
+                    className="button button-primary"
+                    type="button"
+                    disabled={publishingId === quiz.quiz_id || deletingId === quiz.quiz_id}
+                    onClick={() => publish(quiz.quiz_id)}
+                  >
+                    {publishingId === quiz.quiz_id && <span className="spinner" aria-hidden="true" />}
+                    公開する
+                  </button>
+                )}
                 <button
-                  className="button button-primary"
+                  className="button button-danger"
                   type="button"
-                  disabled={publishingId === quiz.quiz_id}
-                  onClick={() => publish(quiz.quiz_id)}
+                  disabled={deletingId === quiz.quiz_id || publishingId === quiz.quiz_id}
+                  onClick={() => remove(quiz)}
                 >
-                  {publishingId === quiz.quiz_id && <span className="spinner" aria-hidden="true" />}
-                  公開する
+                  {deletingId === quiz.quiz_id && <span className="spinner" aria-hidden="true" />}
+                  消去
                 </button>
-              )}
+              </div>
             </div>
           </article>
         ))}

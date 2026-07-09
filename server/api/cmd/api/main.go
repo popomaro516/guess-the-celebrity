@@ -29,6 +29,11 @@ import (
 	platformsqs "github.com/tomy/guess-the-celebrity/server/api/internal/platform/sqs"
 )
 
+type objectStore interface {
+	upload.ObjectStore
+	quiz.ObjectStore
+}
+
 func main() {
 	cfg := config.Load()
 	gin.SetMode(gin.ReleaseMode)
@@ -82,7 +87,7 @@ func main() {
 
 	router := app.NewRouter(app.Dependencies{
 		UploadService:  upload.NewService(imageRepo, presigner, objects, ids, realClock),
-		QuizService:    quiz.NewService(quizRepo, publicFeedRepo, imageRepo, queue, ids, realClock),
+		QuizService:    quiz.NewService(quizRepo, publicFeedRepo, imageRepo, objects, queue, ids, realClock),
 		AttemptService: attempt.NewService(quizRepo, imageRepo),
 		AuthMiddleware: authMiddleware,
 		BaseURL:        cfg.BaseURL,
@@ -125,7 +130,7 @@ func cropQueue(cfg config.Config, awsCfg aws.Config) job.CropJobQueue {
 	return platformsqs.NewCropJobQueue(awssqs.NewFromConfig(awsCfg), cfg.CropQueueURL)
 }
 
-func uploadDependencies(cfg config.Config, awsCfg aws.Config) (upload.Presigner, upload.ObjectStore) {
+func uploadDependencies(cfg config.Config, awsCfg aws.Config) (upload.Presigner, objectStore) {
 	if cfg.S3Bucket == "" {
 		return localpresign.NewPresigner(cfg.BaseURL), localstorage.NewObjectStore()
 	}

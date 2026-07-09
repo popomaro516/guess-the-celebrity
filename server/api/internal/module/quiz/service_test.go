@@ -15,7 +15,7 @@ func TestCreateStoresProcessingQuizAndEnqueuesCropJob(t *testing.T) {
 	repo := newFakeRepository()
 	images := newFakeImageRepository()
 	queue := &fakeCropJobQueue{}
-	svc := quiz.NewService(repo, repo, images, queue, fixedIDs{"quiz_123"}, fixedClock{})
+	svc := quiz.NewService(repo, repo, images, &fakeObjectStore{}, queue, fixedIDs{"quiz_123"}, fixedClock{})
 	images.save(image.Image{
 		ID:               "img_123",
 		OriginalImageKey: "originals/anonymous/img_123/source.jpg",
@@ -63,7 +63,7 @@ func TestCreateStoresProcessingQuizAndEnqueuesCropJob(t *testing.T) {
 
 func TestCreateRejectsInvalidCrop(t *testing.T) {
 	repo := newFakeRepository()
-	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
+	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeObjectStore{}, &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
 
 	_, err := svc.Create(context.Background(), "user-123", quiz.CreateInput{
 		ImageID:    "img_123",
@@ -80,7 +80,7 @@ func TestCreateRejectsInvalidCrop(t *testing.T) {
 
 func TestPublishRequiresReadyQuiz(t *testing.T) {
 	repo := newFakeRepository()
-	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
+	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeObjectStore{}, &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
 	repo.save(quiz.Quiz{ID: "quiz_123", CreatorUserID: "user-123", Status: quiz.StatusProcessing})
 
 	_, err := svc.Publish(context.Background(), "user-123", "quiz_123")
@@ -91,7 +91,7 @@ func TestPublishRequiresReadyQuiz(t *testing.T) {
 
 func TestPublishRejectsUserWhoIsNotCreator(t *testing.T) {
 	repo := newFakeRepository()
-	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
+	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeObjectStore{}, &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
 	repo.save(quiz.Quiz{ID: "quiz_123", CreatorUserID: "owner-123", Status: quiz.StatusReady})
 
 	_, err := svc.Publish(context.Background(), "other-user", "quiz_123")
@@ -110,7 +110,7 @@ func TestPublishRejectsUserWhoIsNotCreator(t *testing.T) {
 
 func TestPublishAllowsCreator(t *testing.T) {
 	repo := newFakeRepository()
-	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
+	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeObjectStore{}, &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
 	repo.save(quiz.Quiz{ID: "quiz_123", CreatorUserID: "user-123", Status: quiz.StatusReady})
 
 	got, err := svc.Publish(context.Background(), "user-123", "quiz_123")
@@ -124,7 +124,7 @@ func TestPublishAllowsCreator(t *testing.T) {
 
 func TestListOwnedReturnsOnlyCreatorsQuizzesNewestFirst(t *testing.T) {
 	repo := newFakeRepository()
-	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
+	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeObjectStore{}, &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
 	repo.save(quiz.Quiz{
 		ID:            "quiz_old",
 		CreatorUserID: "user-123",
@@ -172,7 +172,7 @@ func TestRandomPublishedReturnsFeedProjectionWithoutLoadingQuiz(t *testing.T) {
 			},
 		},
 	}
-	svc := quiz.NewService(repo, feed, newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
+	svc := quiz.NewService(repo, feed, newFakeImageRepository(), &fakeObjectStore{}, &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
 
 	got, err := svc.RandomPublished(context.Background())
 	if err != nil {
@@ -183,6 +183,91 @@ func TestRandomPublishedReturnsFeedProjectionWithoutLoadingQuiz(t *testing.T) {
 	}
 	if repo.findByIDCalls != 0 {
 		t.Fatalf("FindByID calls = %d, want 0", repo.findByIDCalls)
+	}
+}
+
+func TestDeleteRemovesOwnedQuizFeedEntryAndObjects(t *testing.T) {
+	repo := newFakeRepository()
+	feed := &fakePublicFeedRepository{
+		quizzes: []quiz.PublicQuiz{{ID: "quiz_123"}, {ID: "quiz_other"}},
+	}
+	images := newFakeImageRepository()
+	objects := &fakeObjectStore{}
+	svc := quiz.NewService(repo, feed, images, objects, &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
+	repo.save(quiz.Quiz{
+		ID:              "quiz_123",
+		CreatorUserID:   "user-123",
+		ImageID:         "img_123",
+		CroppedImageKey: "quizzes/quiz_123/crop.webp",
+		Status:          quiz.StatusPublished,
+	})
+	images.save(image.Image{
+		ID:               "img_123",
+		OriginalImageKey: "originals/anonymous/img_123/source.jpg",
+		Status:           image.StatusUploaded,
+	})
+
+	err := svc.Delete(context.Background(), "user-123", "quiz_123")
+	if err != nil {
+		t.Fatalf("Delete returned error: %v", err)
+	}
+	if _, err := repo.FindByID(context.Background(), "quiz_123"); !errors.Is(err, quiz.ErrQuizNotFound) {
+		t.Fatalf("FindByID err = %v, want %v", err, quiz.ErrQuizNotFound)
+	}
+	if len(feed.quizzes) != 1 || feed.quizzes[0].ID != "quiz_other" {
+		t.Fatalf("feed quizzes = %+v, want only quiz_other", feed.quizzes)
+	}
+	wantDeleted := []string{"quizzes/quiz_123/crop.webp", "originals/anonymous/img_123/source.jpg"}
+	if !equalStrings(objects.deleted, wantDeleted) {
+		t.Fatalf("deleted objects = %+v, want %+v", objects.deleted, wantDeleted)
+	}
+}
+
+func TestDeleteRejectsUserWhoIsNotCreator(t *testing.T) {
+	repo := newFakeRepository()
+	images := newFakeImageRepository()
+	objects := &fakeObjectStore{}
+	svc := quiz.NewService(repo, repo, images, objects, &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
+	repo.save(quiz.Quiz{
+		ID:              "quiz_123",
+		CreatorUserID:   "owner-123",
+		ImageID:         "img_123",
+		CroppedImageKey: "quizzes/quiz_123/crop.webp",
+	})
+
+	err := svc.Delete(context.Background(), "other-user", "quiz_123")
+	if !errors.Is(err, quiz.ErrDeleteForbidden) {
+		t.Fatalf("err = %v, want %v", err, quiz.ErrDeleteForbidden)
+	}
+	if _, err := repo.FindByID(context.Background(), "quiz_123"); err != nil {
+		t.Fatalf("FindByID returned error: %v", err)
+	}
+	if len(objects.deleted) != 0 {
+		t.Fatalf("deleted objects = %+v, want none", objects.deleted)
+	}
+}
+
+func TestDeleteContinuesWhenImageMetadataIsMissing(t *testing.T) {
+	repo := newFakeRepository()
+	objects := &fakeObjectStore{}
+	svc := quiz.NewService(repo, repo, newFakeImageRepository(), objects, &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
+	repo.save(quiz.Quiz{
+		ID:              "quiz_123",
+		CreatorUserID:   "user-123",
+		ImageID:         "img_missing",
+		CroppedImageKey: "quizzes/quiz_123/crop.webp",
+	})
+
+	err := svc.Delete(context.Background(), "user-123", "quiz_123")
+	if err != nil {
+		t.Fatalf("Delete returned error: %v", err)
+	}
+	if _, err := repo.FindByID(context.Background(), "quiz_123"); !errors.Is(err, quiz.ErrQuizNotFound) {
+		t.Fatalf("FindByID err = %v, want %v", err, quiz.ErrQuizNotFound)
+	}
+	wantDeleted := []string{"quizzes/quiz_123/crop.webp"}
+	if !equalStrings(objects.deleted, wantDeleted) {
+		t.Fatalf("deleted objects = %+v, want %+v", objects.deleted, wantDeleted)
 	}
 }
 
@@ -247,6 +332,15 @@ func (r *fakeRepository) Update(_ context.Context, q quiz.Quiz) error {
 	return nil
 }
 
+func (r *fakeRepository) Delete(_ context.Context, quizID string) error {
+	delete(r.quizzes, quizID)
+	return nil
+}
+
+func (r *fakeRepository) Remove(_ context.Context, _ string) error {
+	return nil
+}
+
 type fakePublicFeedRepository struct {
 	quizzes []quiz.PublicQuiz
 }
@@ -256,6 +350,17 @@ func (r *fakePublicFeedRepository) FindPublicQuizCandidates(_ context.Context, l
 		limit = len(r.quizzes)
 	}
 	return append([]quiz.PublicQuiz(nil), r.quizzes[:limit]...), nil
+}
+
+func (r *fakePublicFeedRepository) Remove(_ context.Context, quizID string) error {
+	filtered := make([]quiz.PublicQuiz, 0, len(r.quizzes))
+	for _, q := range r.quizzes {
+		if q.ID != quizID {
+			filtered = append(filtered, q)
+		}
+	}
+	r.quizzes = filtered
+	return nil
 }
 
 type fakeImageRepository struct {
@@ -285,6 +390,27 @@ type fakeCropJobQueue struct {
 func (q *fakeCropJobQueue) EnqueueCropJob(_ context.Context, cropJob job.CropJob) error {
 	q.jobs = append(q.jobs, cropJob)
 	return nil
+}
+
+type fakeObjectStore struct {
+	deleted []string
+}
+
+func (s *fakeObjectStore) Delete(_ context.Context, objectKey string) error {
+	s.deleted = append(s.deleted, objectKey)
+	return nil
+}
+
+func equalStrings(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
 }
 
 type fixedIDs struct {

@@ -204,6 +204,22 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		})
 	})
 
+	router.DELETE("/quizzes/:quiz_id", deps.AuthMiddleware, func(c *gin.Context) {
+		principal, ok := authenticatedPrincipal(c, logger)
+		if !ok {
+			return
+		}
+		if err := deps.QuizService.Delete(c.Request.Context(), principal.Subject, c.Param("quiz_id")); err != nil {
+			respondError(c, logger, err)
+			return
+		}
+		logEvent(c, logger, slog.LevelInfo, "quiz deleted",
+			slog.String("quiz_id", c.Param("quiz_id")),
+			slog.String("creator_user_id", principal.Subject),
+		)
+		c.Status(http.StatusNoContent)
+	})
+
 	router.POST("/quizzes/:quiz_id/answer", func(c *gin.Context) {
 		var req struct {
 			Answer string `json:"answer" binding:"required"`
@@ -284,7 +300,7 @@ func respondError(c *gin.Context, logger *slog.Logger, err error) {
 			slog.Any("error", err),
 		)
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-	case errors.Is(err, quiz.ErrPublishForbidden):
+	case errors.Is(err, quiz.ErrPublishForbidden), errors.Is(err, quiz.ErrDeleteForbidden):
 		logEvent(c, logger, slog.LevelWarn, "request failed",
 			slog.Int("status", http.StatusForbidden),
 			slog.Any("error", err),

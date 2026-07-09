@@ -16,6 +16,7 @@ type Service struct {
 	repo       Repository
 	publicFeed PublicFeedRepository
 	images     ImageRepository
+	objects    ObjectStore
 	queue      job.CropJobQueue
 	ids        IDGenerator
 	clock      Clock
@@ -29,8 +30,8 @@ type Clock interface {
 	Now() time.Time
 }
 
-func NewService(repo Repository, publicFeed PublicFeedRepository, images ImageRepository, queue job.CropJobQueue, ids IDGenerator, clock Clock) *Service {
-	return &Service{repo: repo, publicFeed: publicFeed, images: images, queue: queue, ids: ids, clock: clock}
+func NewService(repo Repository, publicFeed PublicFeedRepository, images ImageRepository, objects ObjectStore, queue job.CropJobQueue, ids IDGenerator, clock Clock) *Service {
+	return &Service{repo: repo, publicFeed: publicFeed, images: images, objects: objects, queue: queue, ids: ids, clock: clock}
 }
 
 type CreateInput struct {
@@ -142,6 +143,45 @@ func (s *Service) ListOwned(ctx context.Context, creatorUserID string) ([]Quiz, 
 		return quizzes[i].CreatedAt.After(quizzes[j].CreatedAt)
 	})
 	return quizzes, nil
+}
+
+func (s *Service) Delete(ctx context.Context, creatorUserID, quizID string) error {
+	if creatorUserID == "" {
+		return errors.New("creator user ID is required")
+	}
+	q, err := s.repo.FindByID(ctx, quizID)
+	if err != nil {
+		return err
+	}
+	if q.CreatorUserID != creatorUserID {
+		return ErrDeleteForbidden
+	}
+
+	originalImageKey := ""
+	img, err := s.images.FindByID(ctx, q.ImageID)
+	if err != nil && !errors.Is(err, image.ErrImageNotFound) {
+		return err
+	}
+	if err == nil {
+		originalImageKey = img.OriginalImageKey
+	}
+	if err := s.repo.Delete(ctx, q.ID); err != nil {
+		return err
+	}
+	if err := s.publicFeed.Remove(ctx, q.ID); err != nil {
+		return err
+	}
+	if q.CroppedImageKey != "" {
+		if err := s.objects.Delete(ctx, q.CroppedImageKey); err != nil {
+			return err
+		}
+	}
+	if originalImageKey != "" {
+		if err := s.objects.Delete(ctx, originalImageKey); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Service) RandomPublished(ctx context.Context) (PublicQuiz, error) {

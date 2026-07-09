@@ -2,6 +2,7 @@ package dynamodb
 
 import (
 	"context"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -45,6 +46,42 @@ func (r *PublicFeedRepository) FindPublicQuizCandidates(
 	return quizzes, nil
 }
 
+func (r *PublicFeedRepository) Remove(ctx context.Context, quizID string) error {
+	out, err := r.client.GetItem(ctx, &awsdynamodb.GetItemInput{
+		TableName: aws.String(r.tableName),
+		Key: map[string]types.AttributeValue{
+			"feed_id": stringAttr(publicFeedID),
+		},
+	})
+	if err != nil {
+		return err
+	}
+	if len(out.Item) == 0 {
+		return nil
+	}
+
+	quizzes := getPublicQuizzes(out.Item, "quizzes")
+	filtered := make([]quiz.PublicQuiz, 0, len(quizzes))
+	for _, publicQuiz := range quizzes {
+		if publicQuiz.ID != quizID {
+			filtered = append(filtered, publicQuiz)
+		}
+	}
+	if len(filtered) == len(quizzes) {
+		return nil
+	}
+
+	_, err = r.client.PutItem(ctx, &awsdynamodb.PutItemInput{
+		TableName: aws.String(r.tableName),
+		Item: map[string]types.AttributeValue{
+			"feed_id":    stringAttr(publicFeedID),
+			"updated_at": timeAttr(time.Now()),
+			"quizzes":    publicQuizzesAttr(filtered),
+		},
+	})
+	return err
+}
+
 func getPublicQuizzes(item map[string]types.AttributeValue, name string) []quiz.PublicQuiz {
 	entries, ok := item[name].(*types.AttributeValueMemberL)
 	if !ok {
@@ -65,4 +102,18 @@ func getPublicQuizzes(item map[string]types.AttributeValue, name string) []quiz.
 		})
 	}
 	return quizzes
+}
+
+func publicQuizzesAttr(quizzes []quiz.PublicQuiz) types.AttributeValue {
+	values := make([]types.AttributeValue, 0, len(quizzes))
+	for _, q := range quizzes {
+		values = append(values, &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+			"quiz_id":           stringAttr(q.ID),
+			"question":          stringAttr(q.Question),
+			"choices":           choicesAttr(q.Choices),
+			"difficulty":        stringAttr(string(q.Difficulty)),
+			"cropped_image_key": stringAttr(q.CroppedImageKey),
+		}})
+	}
+	return &types.AttributeValueMemberL{Value: values}
 }

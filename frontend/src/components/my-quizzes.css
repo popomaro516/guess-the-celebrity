@@ -83,10 +83,28 @@
   font-size: 12px;
 }
 
+.owned-quiz-actions {
+  display: flex;
+  width: 100%;
+  margin-top: auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .owned-quiz .button {
   min-height: 38px;
-  margin-top: auto;
   padding: 9px 16px;
+}
+
+.button-danger {
+  border-color: var(--color-error-soft);
+  background: var(--color-error-soft);
+  color: var(--color-error);
+}
+
+.button-danger:hover:not(:disabled) {
+  border-color: var(--color-error);
 }
 
 .list-message {
