@@ -129,12 +129,12 @@ class Worker:
                 "source image downloaded",
                 extra=job_log_fields(job, message_id, source_image_bytes=len(image_bytes)),
             )
-            cropped = crop_to_webp(image_bytes, job.crop)
+            question_image = mask_outside_crop_to_webp(image_bytes, job.crop)
             logger.info(
-                "crop image generated",
-                extra=job_log_fields(job, message_id, cropped_image_bytes=len(cropped)),
+                "question image generated",
+                extra=job_log_fields(job, message_id, question_image_bytes=len(question_image)),
             )
-            self._upload(job.output_image_key, cropped)
+            self._upload(job.output_image_key, question_image)
             self._mark_quiz_status(job.quiz_id, "ready")
             logger.info(
                 "crop job completed",
@@ -226,18 +226,29 @@ def validate_crop_job(job: CropJob) -> None:
         raise InvalidCropJobError("crop must fit within image bounds")
 
 
-def crop_to_webp(image_bytes: bytes, crop: Crop) -> bytes:
+def mask_outside_crop_to_webp(image_bytes: bytes, crop: Crop) -> bytes:
     with Image.open(BytesIO(image_bytes)) as img:
         img = ImageOps.exif_transpose(img)
         width, height = img.size
         box = crop_box(width, height, crop)
-        cropped = img.crop(box)
-        if cropped.mode not in ("RGB", "RGBA"):
-            cropped = cropped.convert("RGB")
+        source = to_rgb_on_black(img)
+        masked = Image.new("RGB", (width, height), color=(0, 0, 0))
+        masked.paste(source.crop(box), box)
 
         out = BytesIO()
-        cropped.save(out, format="WEBP", quality=85, method=6)
+        masked.save(out, format="WEBP", quality=85, method=6)
         return out.getvalue()
+
+
+def to_rgb_on_black(img: Image.Image) -> Image.Image:
+    if img.mode == "RGB":
+        return img
+    if img.mode in ("RGBA", "LA") or "transparency" in img.info:
+        rgba = img.convert("RGBA")
+        background = Image.new("RGB", rgba.size, color=(0, 0, 0))
+        background.paste(rgba, mask=rgba.getchannel("A"))
+        return background
+    return img.convert("RGB")
 
 
 def crop_box(image_width: int, image_height: int, crop: Crop) -> tuple[int, int, int, int]:

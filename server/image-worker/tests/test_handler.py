@@ -11,8 +11,8 @@ from image_worker.handler import (
     InvalidCropJobError,
     Worker,
     crop_box,
-    crop_to_webp,
     lambda_handler,
+    mask_outside_crop_to_webp,
     parse_crop_job,
 )
 from lambda_function import lambda_handler as default_lambda_handler
@@ -66,19 +66,19 @@ def test_crop_box_converts_ratios_to_pixels():
     assert crop_box(400, 200, Crop(x=0.25, y=0.1, width=0.5, height=0.4)) == (100, 20, 300, 100)
 
 
-def test_crop_to_webp_outputs_cropped_webp():
+def test_mask_outside_crop_to_webp_outputs_full_size_webp():
     image = Image.new("RGB", (400, 200), color=(255, 0, 0))
     source = BytesIO()
     image.save(source, format="PNG")
 
-    got = crop_to_webp(source.getvalue(), Crop(x=0.25, y=0.1, width=0.5, height=0.4))
+    got = mask_outside_crop_to_webp(source.getvalue(), Crop(x=0.25, y=0.1, width=0.5, height=0.4))
 
-    with Image.open(BytesIO(got)) as cropped:
-        assert cropped.format == "WEBP"
-        assert cropped.size == (200, 80)
+    with Image.open(BytesIO(got)) as masked:
+        assert masked.format == "WEBP"
+        assert masked.size == (400, 200)
 
 
-def test_crop_to_webp_crops_expected_region_from_four_color_grid():
+def test_mask_outside_crop_to_webp_blacks_out_everything_except_crop():
     image = Image.new("RGB", (200, 200))
     pixels = image.load()
     for y in range(200):
@@ -95,14 +95,19 @@ def test_crop_to_webp_crops_expected_region_from_four_color_grid():
     source = BytesIO()
     image.save(source, format="PNG")
 
-    got = crop_to_webp(source.getvalue(), Crop(x=0.5, y=0.5, width=0.5, height=0.5))
+    got = mask_outside_crop_to_webp(source.getvalue(), Crop(x=0.5, y=0.5, width=0.5, height=0.5))
 
-    with Image.open(BytesIO(got)) as cropped:
-        r, g, b = cropped.convert("RGB").getpixel((50, 50))
-        assert cropped.size == (100, 100)
+    with Image.open(BytesIO(got)) as masked:
+        masked = masked.convert("RGB")
+        r, g, b = masked.getpixel((150, 150))
+        outside_r, outside_g, outside_b = masked.getpixel((50, 50))
+        assert masked.size == (200, 200)
         assert r > 200
         assert g > 200
         assert b < 80
+        assert outside_r < 20
+        assert outside_g < 20
+        assert outside_b < 20
 
 
 def test_worker_uploads_crop_and_marks_ready():
