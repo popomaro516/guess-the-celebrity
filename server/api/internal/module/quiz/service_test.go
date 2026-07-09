@@ -81,11 +81,44 @@ func TestCreateRejectsInvalidCrop(t *testing.T) {
 func TestPublishRequiresReadyQuiz(t *testing.T) {
 	repo := newFakeRepository()
 	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
-	repo.save(quiz.Quiz{ID: "quiz_123", Status: quiz.StatusProcessing})
+	repo.save(quiz.Quiz{ID: "quiz_123", CreatorUserID: "user-123", Status: quiz.StatusProcessing})
 
-	_, err := svc.Publish(context.Background(), "quiz_123")
+	_, err := svc.Publish(context.Background(), "user-123", "quiz_123")
 	if !errors.Is(err, quiz.ErrQuizNotReady) {
 		t.Fatalf("err = %v, want %v", err, quiz.ErrQuizNotReady)
+	}
+}
+
+func TestPublishRejectsUserWhoIsNotCreator(t *testing.T) {
+	repo := newFakeRepository()
+	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
+	repo.save(quiz.Quiz{ID: "quiz_123", CreatorUserID: "owner-123", Status: quiz.StatusReady})
+
+	_, err := svc.Publish(context.Background(), "other-user", "quiz_123")
+	if !errors.Is(err, quiz.ErrPublishForbidden) {
+		t.Fatalf("err = %v, want %v", err, quiz.ErrPublishForbidden)
+	}
+
+	saved, err := repo.FindByID(context.Background(), "quiz_123")
+	if err != nil {
+		t.Fatalf("FindByID returned error: %v", err)
+	}
+	if saved.Status != quiz.StatusReady {
+		t.Fatalf("status = %s, want %s", saved.Status, quiz.StatusReady)
+	}
+}
+
+func TestPublishAllowsCreator(t *testing.T) {
+	repo := newFakeRepository()
+	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
+	repo.save(quiz.Quiz{ID: "quiz_123", CreatorUserID: "user-123", Status: quiz.StatusReady})
+
+	got, err := svc.Publish(context.Background(), "user-123", "quiz_123")
+	if err != nil {
+		t.Fatalf("Publish returned error: %v", err)
+	}
+	if got.Status != quiz.StatusPublished {
+		t.Fatalf("status = %s, want %s", got.Status, quiz.StatusPublished)
 	}
 }
 

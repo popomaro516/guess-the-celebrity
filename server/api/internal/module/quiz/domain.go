@@ -11,6 +11,7 @@ var (
 	ErrImageNotUploaded = errors.New("image is not uploaded")
 	ErrQuizNotFound     = errors.New("quiz not found")
 	ErrQuizNotReady     = errors.New("quiz is not ready")
+	ErrPublishForbidden = errors.New("quiz publish forbidden")
 )
 
 type Status string

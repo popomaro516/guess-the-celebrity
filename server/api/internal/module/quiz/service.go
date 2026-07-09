@@ -110,10 +110,13 @@ func (s *Service) Create(ctx context.Context, creatorUserID string, in CreateInp
 	return CreateOutput{ID: id, Status: StatusProcessing}, nil
 }
 
-func (s *Service) Publish(ctx context.Context, quizID string) (CreateOutput, error) {
+func (s *Service) Publish(ctx context.Context, creatorUserID, quizID string) (CreateOutput, error) {
 	q, err := s.repo.FindByID(ctx, quizID)
 	if err != nil {
 		return CreateOutput{}, err
+	}
+	if q.CreatorUserID != creatorUserID {
+		return CreateOutput{}, ErrPublishForbidden
 	}
 	if q.Status != StatusReady {
 		return CreateOutput{}, ErrQuizNotReady

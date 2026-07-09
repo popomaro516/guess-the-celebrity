@@ -140,6 +140,23 @@ func TestAuthoringRoutesRequireAuthentication(t *testing.T) {
 	}
 }
 
+func TestPublishRejectsUserWhoIsNotCreator(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router, quizRepo := newTestRouter(auth.Require(acceptTokens{}))
+	if err := quizRepo.Save(context.Background(), quiz.Quiz{
+		ID:            "quiz_123",
+		CreatorUserID: "owner-123",
+		Status:        quiz.StatusReady,
+	}); err != nil {
+		t.Fatalf("Save returned error: %v", err)
+	}
+
+	body := postJSON(t, router, "/quizzes/quiz_123/publish", nil, http.StatusForbidden)
+	if body["error"] != "forbidden" {
+		t.Fatalf("error = %q, want forbidden", body["error"])
+	}
+}
+
 func postJSON(t *testing.T, handler http.Handler, path string, body any, wantStatus int) map[string]any {
 	t.Helper()
 

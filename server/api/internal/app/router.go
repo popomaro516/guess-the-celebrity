@@ -81,15 +81,8 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	})
 
 	router.POST("/quizzes", deps.AuthMiddleware, func(c *gin.Context) {
-		principal, ok := auth.PrincipalFromContext(c)
+		principal, ok := authenticatedPrincipal(c, logger)
 		if !ok {
-			logger.ErrorContext(c.Request.Context(), "authenticated principal missing",
-				"method", c.Request.Method,
-				"path", c.Request.URL.Path,
-				"route", c.FullPath(),
-				"request_id", requestID(c),
-			)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
 		var req struct {
@@ -137,7 +130,11 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	})
 
 	router.POST("/quizzes/:quiz_id/publish", deps.AuthMiddleware, func(c *gin.Context) {
-		out, err := deps.QuizService.Publish(c.Request.Context(), c.Param("quiz_id"))
+		principal, ok := authenticatedPrincipal(c, logger)
+		if !ok {
+			return
+		}
+		out, err := deps.QuizService.Publish(c.Request.Context(), principal.Subject, c.Param("quiz_id"))
 		if err != nil {
 			respondError(c, logger, err)
 			return
@@ -175,6 +172,21 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	return router
 }
 
+func authenticatedPrincipal(c *gin.Context, logger *slog.Logger) (auth.Principal, bool) {
+	principal, ok := auth.PrincipalFromContext(c)
+	if ok {
+		return principal, true
+	}
+	logger.ErrorContext(c.Request.Context(), "authenticated principal missing",
+		"method", c.Request.Method,
+		"path", c.Request.URL.Path,
+		"route", c.FullPath(),
+		"request_id", requestID(c),
+	)
+	c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+	return auth.Principal{}, false
+}
+
 func bindJSON(c *gin.Context, dst any) bool {
 	if err := c.ShouldBindJSON(dst); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
@@ -195,6 +207,8 @@ func respondError(c *gin.Context, logger *slog.Logger, err error) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, image.ErrImageNotFound), errors.Is(err, quiz.ErrQuizNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+	case errors.Is(err, quiz.ErrPublishForbidden):
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 	default:
 		logger.ErrorContext(c.Request.Context(), "request failed",
 			"error", err,
