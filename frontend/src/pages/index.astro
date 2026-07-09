@@ -3,14 +3,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
 <BaseLayout>
-  <section class="home container" aria-labelledby="home-title">
-    <div class="home-heading">
-      <h1 id="home-title">何をしますか？</h1>
-      <p>
-        画像の一部を切り抜いて4択クイズを作れます。公開された問題には誰でも回答できます。
-      </p>
-    </div>
-
+  <section class="home container" aria-label="操作を選択">
     <div class="action-grid">
       <a class="action-card action-card-create card" href="/create/">
         <div>
@@ -39,32 +32,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
 <style>
   .home {
-    display: flex;
-    min-height: calc(100vh - 64px);
-    justify-content: center;
-    padding-block: 72px 96px;
-    flex-direction: column;
-  }
-
-  .home-heading {
-    max-width: 680px;
-    margin-bottom: 40px;
-  }
-
-  .home-heading h1 {
-    margin-bottom: 12px;
-    font-family: var(--font-body);
-    font-size: clamp(2.25rem, 5vw, 3.5rem);
-    font-weight: 500;
-    letter-spacing: -1.2px;
-  }
-
-  .home-heading p {
-    max-width: 620px;
-    margin: 0;
-    color: var(--color-muted);
-    font-size: 16px;
-    line-height: 1.7;
+    padding-block: 64px 96px;
   }
 
   .action-grid {
@@ -126,12 +94,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
   @media (max-width: 767px) {
     .home {
-      min-height: calc(100vh - 60px);
-      padding-block: 48px 64px;
-    }
-
-    .home-heading {
-      margin-bottom: 28px;
+      padding-block: 40px 64px;
     }
 
     .action-grid {
@@ -146,12 +109,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
   @media (max-width: 479px) {
     .home {
-      justify-content: flex-start;
-      padding-block: 40px 56px;
-    }
-
-    .home-heading h1 {
-      font-size: 2rem;
+      padding-block: 32px 56px;
     }
 
     .action-grid {
