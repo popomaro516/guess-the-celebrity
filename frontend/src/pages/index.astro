@@ -7,10 +7,12 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     <div class="action-grid">
       <a class="action-card action-card-create card" href="/create/">
         <h2>クイズを作る</h2>
+        <span class="button button-primary">作成を始める</span>
       </a>
 
       <a class="action-card card" href="/play/">
         <h2>クイズに答える</h2>
+        <span class="button button-outline">問題を始める</span>
       </a>
     </div>
   </section>
@@ -28,10 +30,12 @@ import BaseLayout from "../layouts/BaseLayout.astro";
   }
 
   .action-card {
-    display: grid;
+    display: flex;
     min-height: 330px;
     padding: 32px;
-    place-items: center;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-direction: column;
     box-shadow: none;
     transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
   }
@@ -52,6 +56,10 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     font-size: clamp(1.6rem, 3vw, 2.1rem);
     font-weight: 500;
     letter-spacing: -0.4px;
+  }
+
+  .action-card .button {
+    width: fit-content;
   }
 
   @media (max-width: 767px) {
