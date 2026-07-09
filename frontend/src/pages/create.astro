@@ -1,0 +1,10 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageIntro from "../components/PageIntro.astro";
+import QuizCreator from "../components/QuizCreator";
+---
+
+<BaseLayout title="クイズを作成 | Guess the Celebrity">
+  <PageIntro title="Create a quiz" />
+  <QuizCreator client:load />
+</BaseLayout>

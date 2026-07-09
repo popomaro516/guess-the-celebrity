@@ -1,4 +1,21 @@
 services:
+  frontend:
+    build:
+      context: ./frontend
+    command: ["sh", "-c", "rm -f .astro/dev.json && npm run dev"]
+    env_file:
+      - path: ./frontend/.env.local
+        required: false
+    environment:
+      API_PROXY_TARGET: "http://api:8080"
+    ports:
+      - "4321:4321"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      - api
+
   api:
     build:
       context: ./server/api
@@ -17,4 +34,5 @@ services:
       - go-mod-cache:/go/pkg/mod
 
 volumes:
+  frontend-node-modules:
   go-mod-cache:
