@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -285,6 +287,76 @@ func TestPublishRejectsUserWhoIsNotCreator(t *testing.T) {
 	}
 }
 
+func TestRouterAssignsRequestIDAndLogsPrincipalSubject(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var logOutput bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logOutput, nil))
+	router, _ := newTestRouterWithLogger(auth.Require(acceptTokens{}), logger)
+
+	req := httptest.NewRequest(http.MethodGet, "/quizzes/mine", nil)
+	req.Header.Set("Authorization", "Bearer valid-token")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /quizzes/mine status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	requestID := rec.Header().Get("X-Request-Id")
+	if requestID == "" {
+		t.Fatal("X-Request-Id header is empty")
+	}
+	logs := logOutput.String()
+	if !strings.Contains(logs, `"msg":"http request"`) {
+		t.Fatalf("request log missing: %s", logs)
+	}
+	if !strings.Contains(logs, `"principal_subject":"cognito-sub-123"`) {
+		t.Fatalf("principal_subject missing from logs: %s", logs)
+	}
+	if !strings.Contains(logs, `"request_id":"`+requestID+`"`) {
+		t.Fatalf("request_id %q missing from logs: %s", requestID, logs)
+	}
+}
+
+func TestCreateQuizLogsStructuredEvent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var logOutput bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logOutput, nil))
+	router, _ := newTestRouterWithLogger(auth.Disabled(), logger)
+
+	presignBody := postJSON(t, router, "/uploads/presign", map[string]any{
+		"filename":     "cat.jpg",
+		"content_type": "image/jpeg",
+		"size":         2048,
+	}, http.StatusOK)
+	imageID := presignBody["image_id"].(string)
+	postJSON(t, router, "/images/"+imageID+"/complete", nil, http.StatusOK)
+
+	postJSON(t, router, "/quizzes", map[string]any{
+		"image_id":   imageID,
+		"question":   "これは何の動物？",
+		"answer":     "cat",
+		"choices":    []string{"cat", "dog", "fox", "rabbit"},
+		"difficulty": "normal",
+		"crop": map[string]float64{
+			"x":      0.24,
+			"y":      0.18,
+			"width":  0.32,
+			"height": 0.28,
+		},
+	}, http.StatusCreated)
+
+	logs := logOutput.String()
+	if !strings.Contains(logs, `"msg":"quiz created"`) {
+		t.Fatalf("quiz created log missing: %s", logs)
+	}
+	if !strings.Contains(logs, `"quiz_id":"quiz_2"`) {
+		t.Fatalf("quiz_id missing from logs: %s", logs)
+	}
+	if !strings.Contains(logs, `"creator_user_id":"local-development-user"`) {
+		t.Fatalf("creator_user_id missing from logs: %s", logs)
+	}
+}
+
 func postJSON(t *testing.T, handler http.Handler, path string, body any, wantStatus int) map[string]any {
 	t.Helper()
 
@@ -316,6 +388,10 @@ func testRouter() http.Handler {
 }
 
 func newTestRouter(authMiddleware gin.HandlerFunc) (http.Handler, *localdb.QuizRepository) {
+	return newTestRouterWithLogger(authMiddleware, nil)
+}
+
+func newTestRouterWithLogger(authMiddleware gin.HandlerFunc, logger *slog.Logger) (http.Handler, *localdb.QuizRepository) {
 	store := localdb.NewStore()
 	imageRepo := localdb.NewImageRepository(store)
 	quizRepo := localdb.NewQuizRepository(store)
@@ -332,6 +408,7 @@ func newTestRouter(authMiddleware gin.HandlerFunc) (http.Handler, *localdb.QuizR
 		AuthMiddleware: authMiddleware,
 		BaseURL:        "http://localhost:8080",
 		AssetBaseURL:   "http://localhost:8080",
+		Logger:         logger,
 	})
 	return router, quizRepo
 }
