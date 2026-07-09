@@ -19,6 +19,23 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 </BaseLayout>
 
 <style>
+  :global(body) {
+    background-color: #d9dcdd;
+    background-image:
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='0 .1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E"),
+      radial-gradient(circle at center, rgb(67 72 75 / 16%) 0 2px, rgb(255 255 255 / 25%) 2.5px 3.5px, transparent 4px),
+      linear-gradient(90deg, transparent calc(50% - 0.5px), rgb(91 97 100 / 12%) 50%, transparent calc(50% + 0.5px)),
+      linear-gradient(180deg, transparent calc(50% - 0.5px), rgb(91 97 100 / 10%) 50%, transparent calc(50% + 0.5px)),
+      linear-gradient(135deg, rgb(255 255 255 / 56%), rgb(179 184 186 / 18%) 52%, rgb(255 255 255 / 22%));
+    background-position: 0 0, 0 16px, 0 0, 0 0, 0 0;
+    background-size: 180px 180px, 180px 180px, 100% 100%, 100% 100%, 100% 100%;
+  }
+
+  :global(.site-header) {
+    border-bottom-color: rgb(91 97 100 / 16%);
+    background: rgb(225 228 229 / 82%);
+  }
+
   .home {
     display: grid;
     width: min(calc(100% - 48px), 940px);
@@ -42,8 +59,10 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     gap: 40px;
     padding: 40px;
     border-radius: 24px;
+    background: rgb(248 249 249 / 92%);
     flex-direction: column;
     text-align: center;
+    backdrop-filter: blur(8px);
     transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
   }
 
