@@ -17,7 +17,8 @@
 .quiz-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  background: rgb(12 10 9);
+  object-fit: contain;
 }
 
 .difficulty {
@@ -128,7 +129,8 @@
 .result-image img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  background: rgb(12 10 9);
+  object-fit: contain;
 }
 
 .result-image-missing {

@@ -32,7 +32,8 @@
 .owned-quiz-image img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  background: rgb(12 10 9);
+  object-fit: contain;
 }
 
 .owned-quiz-content {
