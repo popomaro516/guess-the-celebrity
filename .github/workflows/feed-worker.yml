@@ -1,0 +1,62 @@
+name: Feed Worker
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/feed-worker.yml"
+      - "server/feed-worker/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/feed-worker.yml"
+      - "server/feed-worker/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Lambda package
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server/feed-worker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: server/feed-worker/requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run lint
+        run: ruff check .
+
+      - name: Check formatting
+        run: ruff format --check .
+
+      - name: Run tests
+        run: pytest
+
+      - name: Package Lambda
+        run: |
+          rm -rf build ../../dist/lambda-feed-worker.zip
+          mkdir -p build ../../dist
+          pip install -r requirements.txt -t build
+          cp -R src/. build/
+          cd build
+          zip -q -r ../../../dist/lambda-feed-worker.zip .
+
+      - name: Upload Lambda package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: feed-worker-lambda-package
+          path: dist/lambda-feed-worker.zip
+          if-no-files-found: error
