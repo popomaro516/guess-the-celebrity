@@ -2,6 +2,7 @@ services:
   frontend:
     build:
       context: ./frontend
+    command: ["sh", "-c", "rm -f .astro/dev.json && npm run dev"]
     env_file:
       - path: ./frontend/.env.local
         required: false
