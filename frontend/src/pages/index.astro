@@ -6,25 +6,11 @@ import BaseLayout from "../layouts/BaseLayout.astro";
   <section class="home container" aria-label="操作を選択">
     <div class="action-grid">
       <a class="action-card action-card-create card" href="/create/">
-        <div>
-          <span class="action-label">ログインが必要</span>
-          <h2>クイズを作る</h2>
-          <p>画像を選び、見せる範囲、問題文、4つの選択肢を設定します。</p>
-        </div>
-        <span class="button button-primary">
-          作成を始める <span aria-hidden="true">→</span>
-        </span>
+        <h2>クイズを作る</h2>
       </a>
 
       <a class="action-card card" href="/play/">
-        <div>
-          <span class="action-label">ログイン不要</span>
-          <h2>クイズに答える</h2>
-          <p>公開されている問題からランダムに出題します。</p>
-        </div>
-        <span class="button button-outline">
-          問題を始める <span aria-hidden="true">→</span>
-        </span>
+        <h2>クイズに答える</h2>
       </a>
     </div>
   </section>
@@ -42,11 +28,10 @@ import BaseLayout from "../layouts/BaseLayout.astro";
   }
 
   .action-card {
-    display: flex;
+    display: grid;
     min-height: 330px;
     padding: 32px;
-    justify-content: space-between;
-    flex-direction: column;
+    place-items: center;
     box-shadow: none;
     transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
   }
@@ -61,35 +46,12 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     border-color: var(--color-hairline-strong);
   }
 
-  .action-label {
-    display: inline-block;
-    margin-bottom: 28px;
-    padding: 5px 10px;
-    border-radius: 9999px;
-    background: var(--color-surface);
-    color: var(--color-muted);
-    font-size: 12px;
-    font-weight: 600;
-  }
-
   .action-card h2 {
-    margin-bottom: 12px;
+    margin: 0;
     font-family: var(--font-body);
     font-size: clamp(1.6rem, 3vw, 2.1rem);
     font-weight: 500;
     letter-spacing: -0.4px;
-  }
-
-  .action-card p {
-    max-width: 420px;
-    margin: 0;
-    color: var(--color-muted);
-    font-size: 15px;
-  }
-
-  .action-card .button {
-    width: fit-content;
-    margin-top: 32px;
   }
 
   @media (max-width: 767px) {
