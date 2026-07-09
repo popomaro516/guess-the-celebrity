@@ -155,7 +155,75 @@ func TestMyQuizzesRouteRequiresAuthentication(t *testing.T) {
 	}
 }
 
-func TestMyQuizzesRouteIsNotImplemented(t *testing.T) {
+func TestMyQuizzesRouteReturnsAuthenticatedUsersQuizzes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router, quizRepo := newTestRouter(auth.Require(acceptTokens{}))
+	createdAt := time.Date(2026, 7, 3, 0, 0, 0, 0, time.UTC)
+	for _, q := range []quiz.Quiz{
+		{
+			ID:              "quiz_owned",
+			CreatorUserID:   "cognito-sub-123",
+			Question:        "これは誰？",
+			Difficulty:      quiz.DifficultyNormal,
+			Status:          quiz.StatusReady,
+			CroppedImageKey: "quizzes/quiz_owned/crop.webp",
+			CreatedAt:       createdAt,
+		},
+		{
+			ID:            "quiz_other",
+			CreatorUserID: "other-user",
+			Question:      "他人の問題",
+			Difficulty:    quiz.DifficultyHard,
+			Status:        quiz.StatusPublished,
+			CreatedAt:     createdAt.Add(time.Hour),
+		},
+	} {
+		if err := quizRepo.Save(context.Background(), q); err != nil {
+			t.Fatalf("Save returned error: %v", err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/quizzes/mine", nil)
+	req.Header.Set("Authorization", "Bearer valid-token")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /quizzes/mine status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var response struct {
+		Quizzes []struct {
+			ID              string          `json:"quiz_id"`
+			Question        string          `json:"question"`
+			Difficulty      quiz.Difficulty `json:"difficulty"`
+			Status          quiz.Status     `json:"status"`
+			CroppedImageURL string          `json:"cropped_image_url"`
+			CreatedAt       string          `json:"created_at"`
+		} `json:"quizzes"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json decode: %v", err)
+	}
+	if len(response.Quizzes) != 1 {
+		t.Fatalf("len(quizzes) = %d, want 1", len(response.Quizzes))
+	}
+	got := response.Quizzes[0]
+	if got.ID != "quiz_owned" || got.Question != "これは誰？" {
+		t.Fatalf("unexpected quiz: %+v", got)
+	}
+	if got.Difficulty != quiz.DifficultyNormal || got.Status != quiz.StatusReady {
+		t.Fatalf("unexpected quiz metadata: %+v", got)
+	}
+	if got.CroppedImageURL != "http://localhost:8080/quizzes/quiz_owned/crop.webp" {
+		t.Fatalf("cropped_image_url = %q", got.CroppedImageURL)
+	}
+	if got.CreatedAt != createdAt.Format(time.RFC3339Nano) {
+		t.Fatalf("created_at = %q, want %q", got.CreatedAt, createdAt.Format(time.RFC3339Nano))
+	}
+}
+
+func TestMyQuizzesRouteReturnsEmptyArray(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router, _ := newTestRouter(auth.Require(acceptTokens{}))
 
@@ -164,8 +232,39 @@ func TestMyQuizzesRouteIsNotImplemented(t *testing.T) {
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusNotImplemented {
-		t.Fatalf("GET /quizzes/mine status = %d, want %d", rec.Code, http.StatusNotImplemented)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /quizzes/mine status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if rec.Body.String() != `{"quizzes":[]}` {
+		t.Fatalf("body = %s, want empty quizzes array", rec.Body.String())
+	}
+}
+
+func TestMyQuizzesRouteOmitsCropURLWhileProcessing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router, quizRepo := newTestRouter(auth.Require(acceptTokens{}))
+	if err := quizRepo.Save(context.Background(), quiz.Quiz{
+		ID:              "quiz_processing",
+		CreatorUserID:   "cognito-sub-123",
+		Status:          quiz.StatusProcessing,
+		CroppedImageKey: "quizzes/quiz_processing/crop.webp",
+	}); err != nil {
+		t.Fatalf("Save returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/quizzes/mine", nil)
+	req.Header.Set("Authorization", "Bearer valid-token")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	var response struct {
+		Quizzes []map[string]any `json:"quizzes"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json decode: %v", err)
+	}
+	if _, exists := response.Quizzes[0]["cropped_image_url"]; exists {
+		t.Fatalf("processing quiz must not include cropped_image_url: %s", rec.Body.String())
 	}
 }
 

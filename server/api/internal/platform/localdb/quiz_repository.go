@@ -33,6 +33,17 @@ func (r *QuizRepository) FindByID(_ context.Context, id string) (quiz.Quiz, erro
 	return q, nil
 }
 
+func (r *QuizRepository) FindByCreatorUserID(_ context.Context, creatorUserID string) ([]quiz.Quiz, error) {
+	quizzes := make([]quiz.Quiz, 0)
+	for _, doc := range r.store.list(quizzesCollection) {
+		q, ok := doc.(quiz.Quiz)
+		if ok && q.CreatorUserID == creatorUserID {
+			quizzes = append(quizzes, q)
+		}
+	}
+	return quizzes, nil
+}
+
 func (r *QuizRepository) FindPublicQuizCandidateIDs(_ context.Context, limit int) ([]string, error) {
 	ids := make([]string, 0, limit)
 	for _, doc := range r.store.list(quizzesCollection) {

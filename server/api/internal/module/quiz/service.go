@@ -5,6 +5,7 @@ import (
 	cryptorand "crypto/rand"
 	"errors"
 	"math/big"
+	"sort"
 	"time"
 
 	"github.com/tomy/guess-the-celebrity/server/api/internal/module/image"
@@ -127,6 +128,20 @@ func (s *Service) Publish(ctx context.Context, creatorUserID, quizID string) (Cr
 		return CreateOutput{}, err
 	}
 	return CreateOutput{ID: q.ID, Status: q.Status}, nil
+}
+
+func (s *Service) ListOwned(ctx context.Context, creatorUserID string) ([]Quiz, error) {
+	if creatorUserID == "" {
+		return nil, errors.New("creator user ID is required")
+	}
+	quizzes, err := s.repo.FindByCreatorUserID(ctx, creatorUserID)
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(quizzes, func(i, j int) bool {
+		return quizzes[i].CreatedAt.After(quizzes[j].CreatedAt)
+	})
+	return quizzes, nil
 }
 
 func (s *Service) RandomPublished(ctx context.Context) (PublicQuiz, error) {

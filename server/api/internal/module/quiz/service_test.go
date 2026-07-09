@@ -122,6 +122,43 @@ func TestPublishAllowsCreator(t *testing.T) {
 	}
 }
 
+func TestListOwnedReturnsOnlyCreatorsQuizzesNewestFirst(t *testing.T) {
+	repo := newFakeRepository()
+	svc := quiz.NewService(repo, repo, newFakeImageRepository(), &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
+	repo.save(quiz.Quiz{
+		ID:            "quiz_old",
+		CreatorUserID: "user-123",
+		Question:      "古い問題",
+		Status:        quiz.StatusReady,
+		CreatedAt:     time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC),
+	})
+	repo.save(quiz.Quiz{
+		ID:            "quiz_other",
+		CreatorUserID: "other-user",
+		Question:      "別ユーザーの問題",
+		Status:        quiz.StatusPublished,
+		CreatedAt:     time.Date(2026, 7, 3, 0, 0, 0, 0, time.UTC),
+	})
+	repo.save(quiz.Quiz{
+		ID:            "quiz_new",
+		CreatorUserID: "user-123",
+		Question:      "新しい問題",
+		Status:        quiz.StatusProcessing,
+		CreatedAt:     time.Date(2026, 7, 2, 0, 0, 0, 0, time.UTC),
+	})
+
+	got, err := svc.ListOwned(context.Background(), "user-123")
+	if err != nil {
+		t.Fatalf("ListOwned returned error: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("len(ListOwned) = %d, want 2", len(got))
+	}
+	if got[0].ID != "quiz_new" || got[1].ID != "quiz_old" {
+		t.Fatalf("quiz IDs = [%s, %s], want [quiz_new, quiz_old]", got[0].ID, got[1].ID)
+	}
+}
+
 type fakeRepository struct {
 	quizzes map[string]quiz.Quiz
 }
@@ -145,6 +182,16 @@ func (r *fakeRepository) FindByID(_ context.Context, id string) (quiz.Quiz, erro
 		return quiz.Quiz{}, quiz.ErrQuizNotFound
 	}
 	return q, nil
+}
+
+func (r *fakeRepository) FindByCreatorUserID(_ context.Context, creatorUserID string) ([]quiz.Quiz, error) {
+	quizzes := make([]quiz.Quiz, 0)
+	for _, q := range r.quizzes {
+		if q.CreatorUserID == creatorUserID {
+			quizzes = append(quizzes, q)
+		}
+	}
+	return quizzes, nil
 }
 
 func (r *fakeRepository) FindPublicQuizCandidateIDs(_ context.Context, limit int) ([]string, error) {
