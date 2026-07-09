@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/tomy/guess-the-celebrity/server/api/internal/module/quiz"
 )
 
 type PublicFeedRepository struct {
@@ -20,12 +21,12 @@ func NewPublicFeedRepository(
 	return &PublicFeedRepository{client: client, tableName: tableName}
 }
 
-func (r *PublicFeedRepository) FindPublicQuizCandidateIDs(
+func (r *PublicFeedRepository) FindPublicQuizCandidates(
 	ctx context.Context,
 	limit int,
-) ([]string, error) {
+) ([]quiz.PublicQuiz, error) {
 	if limit <= 0 {
-		return nil, nil
+		return []quiz.PublicQuiz{}, nil
 	}
 	out, err := r.client.GetItem(ctx, &awsdynamodb.GetItemInput{
 		TableName: aws.String(r.tableName),
@@ -37,9 +38,31 @@ func (r *PublicFeedRepository) FindPublicQuizCandidateIDs(
 		return nil, err
 	}
 
-	quizIDs := getStrings(out.Item, "quiz_ids")
-	if len(quizIDs) > limit {
-		quizIDs = quizIDs[:limit]
+	quizzes := getPublicQuizzes(out.Item, "quizzes")
+	if len(quizzes) > limit {
+		quizzes = quizzes[:limit]
 	}
-	return quizIDs, nil
+	return quizzes, nil
+}
+
+func getPublicQuizzes(item map[string]types.AttributeValue, name string) []quiz.PublicQuiz {
+	entries, ok := item[name].(*types.AttributeValueMemberL)
+	if !ok {
+		return []quiz.PublicQuiz{}
+	}
+	quizzes := make([]quiz.PublicQuiz, 0, len(entries.Value))
+	for _, entry := range entries.Value {
+		value, ok := entry.(*types.AttributeValueMemberM)
+		if !ok {
+			continue
+		}
+		quizzes = append(quizzes, quiz.PublicQuiz{
+			ID:              getString(value.Value, "quiz_id"),
+			Question:        getString(value.Value, "question"),
+			Choices:         getChoices(value.Value, "choices"),
+			Difficulty:      quiz.Difficulty(getString(value.Value, "difficulty")),
+			CroppedImageKey: getString(value.Value, "cropped_image_key"),
+		})
+	}
+	return quizzes
 }

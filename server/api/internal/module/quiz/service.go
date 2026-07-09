@@ -145,38 +145,21 @@ func (s *Service) ListOwned(ctx context.Context, creatorUserID string) ([]Quiz, 
 }
 
 func (s *Service) RandomPublished(ctx context.Context) (PublicQuiz, error) {
-	quizIDs, err := s.publicFeed.FindPublicQuizCandidateIDs(ctx, 10)
+	quizzes, err := s.publicFeed.FindPublicQuizCandidates(ctx, 10)
 	if err != nil {
 		return PublicQuiz{}, err
 	}
-	if len(quizIDs) == 0 {
+	if len(quizzes) == 0 {
 		return PublicQuiz{}, ErrQuizNotFound
 	}
 
-	index, err := randomIndex(len(quizIDs))
+	index, err := randomIndex(len(quizzes))
 	if err != nil {
 		return PublicQuiz{}, err
 	}
-	for offset := range quizIDs {
-		q, err := s.repo.FindByID(ctx, quizIDs[(index+offset)%len(quizIDs)])
-		if errors.Is(err, ErrQuizNotFound) {
-			continue
-		}
-		if err != nil {
-			return PublicQuiz{}, err
-		}
-		if q.Status != StatusPublished {
-			continue
-		}
-		return PublicQuiz{
-			ID:              q.ID,
-			Question:        q.Question,
-			CroppedImageKey: q.CroppedImageKey,
-			Choices:         append([]string(nil), q.Choices...),
-			Difficulty:      q.Difficulty,
-		}, nil
-	}
-	return PublicQuiz{}, ErrQuizNotFound
+	selected := quizzes[index]
+	selected.Choices = append([]string(nil), selected.Choices...)
+	return selected, nil
 }
 
 func validCrop(c Crop) bool {
