@@ -1,0 +1,16 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageIntro from "../components/PageIntro.astro";
+import MyQuizzes from "../components/MyQuizzes";
+---
+
+<BaseLayout title="作成したクイズ | Guess the Celebrity">
+  <PageIntro
+    eyebrow="Your quizzes"
+    title="作成したクイズ"
+    description="画像の処理状況を確認し、準備ができたクイズを公開します。"
+  />
+  <section class="quiz-list-shell container">
+    <MyQuizzes client:load />
+  </section>
+</BaseLayout>

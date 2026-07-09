@@ -1,0 +1,291 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout>
+  <section class="hero container">
+    <div class="hero-copy">
+      <p class="eyebrow">Look closer</p>
+      <h1>一枚の断片から、<br />答えを見抜く。</h1>
+      <p class="hero-description">
+        写真の一部だけを手がかりに挑む4択クイズ。答えるか、あなたの一問を作るか。
+      </p>
+    </div>
+
+    <div class="hero-art" aria-hidden="true">
+      <div class="orb orb-mint"></div>
+      <div class="orb orb-peach"></div>
+      <div class="orb orb-lavender"></div>
+      <div class="portrait">
+        <span class="portrait-head"></span>
+        <span class="portrait-body"></span>
+      </div>
+      <div class="crop-frame">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <p class="art-caption">ほんの一部が、大きなヒントになる。</p>
+    </div>
+  </section>
+
+  <section class="choices container" aria-labelledby="choose-title">
+    <div class="section-heading">
+      <p class="eyebrow">Choose your path</p>
+      <h2 id="choose-title">今日は、どちらにしますか？</h2>
+    </div>
+
+    <div class="choice-grid">
+      <a class="choice-card card" href="/play/">
+        <span class="choice-number">01</span>
+        <div>
+          <h3>クイズに回答</h3>
+          <p>切り抜かれた写真をよく見て、4つの選択肢から答えを選びます。</p>
+        </div>
+        <span class="choice-action">挑戦する <span aria-hidden="true">→</span></span>
+      </a>
+
+      <a class="choice-card card" href="/create/">
+        <span class="choice-number">02</span>
+        <div>
+          <h3>クイズを作成</h3>
+          <p>写真をアップロードし、見せたい範囲を選んで一問を公開します。</p>
+        </div>
+        <span class="choice-action">作成する <span aria-hidden="true">→</span></span>
+      </a>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero {
+    display: grid;
+    min-height: 620px;
+    grid-template-columns: 1.05fr 0.95fr;
+    align-items: center;
+    gap: 64px;
+    padding-block: 72px 96px;
+  }
+
+  .hero-copy h1 {
+    max-width: 680px;
+    margin-bottom: 24px;
+  }
+
+  .hero-description {
+    max-width: 540px;
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 17px;
+    line-height: 1.7;
+  }
+
+  .hero-art {
+    position: relative;
+    min-height: 470px;
+    overflow: hidden;
+    border-radius: 24px;
+    background: var(--color-canvas-soft);
+    box-shadow: inset 0 0 0 1px rgb(231 229 228 / 65%);
+  }
+
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(3px);
+  }
+
+  .orb-mint {
+    width: 330px;
+    height: 330px;
+    top: -80px;
+    right: -60px;
+    background: radial-gradient(circle at 35% 35%, var(--color-mint), transparent 68%);
+  }
+
+  .orb-peach {
+    width: 320px;
+    height: 320px;
+    bottom: -130px;
+    left: -80px;
+    background: radial-gradient(circle at 55% 45%, var(--color-peach), transparent 68%);
+  }
+
+  .orb-lavender {
+    width: 260px;
+    height: 260px;
+    bottom: -45px;
+    right: -70px;
+    background: radial-gradient(circle, var(--color-lavender), transparent 68%);
+  }
+
+  .portrait {
+    position: absolute;
+    inset: 62px 74px 74px;
+    overflow: hidden;
+    border-radius: 9999px 9999px 20px 20px;
+    background: linear-gradient(150deg, rgb(255 255 255 / 78%), rgb(240 239 237 / 45%));
+    box-shadow: 0 28px 80px rgb(12 10 9 / 9%);
+  }
+
+  .portrait-head {
+    position: absolute;
+    width: 130px;
+    height: 150px;
+    top: 62px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 48% 48% 44% 44%;
+    background: linear-gradient(145deg, #d6d3d1, #a8a29e);
+  }
+
+  .portrait-body {
+    position: absolute;
+    width: 280px;
+    height: 190px;
+    bottom: -60px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 50% 50% 0 0;
+    background: linear-gradient(145deg, #78716c, #292524);
+  }
+
+  .crop-frame {
+    position: absolute;
+    width: 155px;
+    height: 116px;
+    top: 128px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 1px solid rgb(255 255 255 / 76%);
+    box-shadow: 0 0 0 999px rgb(12 10 9 / 12%);
+  }
+
+  .crop-frame span {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-color: white;
+    border-style: solid;
+  }
+
+  .crop-frame span:nth-child(1) { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+  .crop-frame span:nth-child(2) { top: -1px; right: -1px; border-width: 2px 2px 0 0; }
+  .crop-frame span:nth-child(3) { bottom: -1px; left: -1px; border-width: 0 0 2px 2px; }
+  .crop-frame span:nth-child(4) { right: -1px; bottom: -1px; border-width: 0 2px 2px 0; }
+
+  .art-caption {
+    position: absolute;
+    right: 24px;
+    bottom: 16px;
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 12px;
+  }
+
+  .choices {
+    padding-block: 96px;
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  .section-heading {
+    max-width: 720px;
+    margin-bottom: 40px;
+  }
+
+  .section-heading h2 {
+    margin: 0;
+  }
+
+  .choice-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+
+  .choice-card {
+    display: grid;
+    min-height: 280px;
+    padding: 32px;
+    grid-template-rows: auto 1fr auto;
+    box-shadow: none;
+    transition: transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  .choice-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-card);
+  }
+
+  .choice-number {
+    color: var(--color-muted-soft);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.96px;
+  }
+
+  .choice-card h3 {
+    margin: 28px 0 10px;
+    font-size: 30px;
+  }
+
+  .choice-card p {
+    max-width: 420px;
+    margin: 0;
+    color: var(--color-muted);
+  }
+
+  .choice-action {
+    align-self: end;
+    color: var(--color-ink);
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  @media (max-width: 900px) {
+    .hero {
+      min-height: auto;
+      grid-template-columns: 1fr;
+      gap: 48px;
+      padding-block: 64px;
+    }
+
+    .hero-art {
+      min-height: 420px;
+    }
+  }
+
+  @media (max-width: 639px) {
+    .hero {
+      gap: 36px;
+      padding-block: 48px 64px;
+    }
+
+    .hero-copy h1 br {
+      display: none;
+    }
+
+    .hero-art {
+      min-height: 360px;
+    }
+
+    .portrait {
+      inset: 48px 42px 62px;
+    }
+
+    .art-caption {
+      display: none;
+    }
+
+    .choices {
+      padding-block: 64px;
+    }
+
+    .choice-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .choice-card {
+      min-height: 245px;
+      padding: 24px;
+    }
+  }
+</style>
