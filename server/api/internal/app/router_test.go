@@ -96,6 +96,52 @@ func TestCreateQuizStoresAuthenticatedUserSubject(t *testing.T) {
 	}
 }
 
+func TestAnswerRouteRevealsAnswerAndOriginalImageWhenWrong(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router, quizRepo := newTestRouter(auth.Disabled())
+
+	presignBody := postJSON(t, router, "/uploads/presign", map[string]any{
+		"filename":     "cat.jpg",
+		"content_type": "image/jpeg",
+		"size":         2048,
+	}, http.StatusOK)
+	imageID := presignBody["image_id"].(string)
+	postJSON(t, router, "/images/"+imageID+"/complete", nil, http.StatusOK)
+
+	quizBody := postJSON(t, router, "/quizzes", map[string]any{
+		"image_id":   imageID,
+		"question":   "これは何の動物？",
+		"answer":     "cat",
+		"choices":    []string{"cat", "dog", "fox", "rabbit"},
+		"difficulty": "normal",
+		"crop": map[string]float64{
+			"x": 0.24, "y": 0.18, "width": 0.32, "height": 0.28,
+		},
+	}, http.StatusCreated)
+	quizID := quizBody["quiz_id"].(string)
+	saved, err := quizRepo.FindByID(context.Background(), quizID)
+	if err != nil {
+		t.Fatalf("FindByID returned error: %v", err)
+	}
+	saved.Status = quiz.StatusPublished
+	if err := quizRepo.Save(context.Background(), saved); err != nil {
+		t.Fatalf("Save returned error: %v", err)
+	}
+
+	answerBody := postJSON(t, router, "/quizzes/"+quizID+"/answer", map[string]any{
+		"answer": "dog",
+	}, http.StatusOK)
+	if answerBody["correct"] != false {
+		t.Fatalf("correct = %v, want false", answerBody["correct"])
+	}
+	if answerBody["correct_answer"] != "cat" {
+		t.Fatalf("correct_answer = %q, want cat", answerBody["correct_answer"])
+	}
+	if answerBody["original_image_url"] != "http://localhost:8080/originals/anonymous/img_1/source.jpg" {
+		t.Fatalf("original_image_url = %q", answerBody["original_image_url"])
+	}
+}
+
 func TestHealthRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := testRouter()

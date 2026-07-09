@@ -37,16 +37,12 @@ func (s *Service) Answer(ctx context.Context, in AnswerInput) (AnswerOutput, err
 	}
 
 	correct := in.Answer == q.Answer
-	if !correct {
-		return AnswerOutput{Correct: false}, nil
-	}
-
 	img, err := s.images.FindByID(ctx, q.ImageID)
 	if err != nil {
 		return AnswerOutput{}, err
 	}
 	return AnswerOutput{
-		Correct:          true,
+		Correct:          correct,
 		CorrectAnswer:    q.Answer,
 		OriginalImageKey: img.OriginalImageKey,
 	}, nil

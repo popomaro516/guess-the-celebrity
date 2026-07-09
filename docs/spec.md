@@ -150,8 +150,7 @@ APIは次の処理を行う。
 
 - 回答APIは認証を必要としない
 - 回答対象は`published`のクイズに限る
-- 不正解時は`correct: false`のみを返す
-- 正解時は正解と元画像URLを返す
+- 正誤に関わらず、判定結果、正解、元画像URLを返す
 - 回答履歴は保存しない
 
 ## 9. API
@@ -346,7 +345,9 @@ Request:
 
 ```json
 {
-  "correct": false
+  "correct": false,
+  "correct_answer": "subject_a",
+  "original_image_url": "https://..."
 }
 ```
 
