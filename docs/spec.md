@@ -136,15 +136,13 @@ processing -> ready -> published
 
 ## 7. ランダム出題
 
-公開済みクイズの候補はfeed workerが最大10件のIDリストとして事前生成する。
+公開済みクイズの候補はfeed workerが公開用データを最大10件含むスナップショットとして事前生成する。
 
 APIは次の処理を行う。
 
 1. `feed_id = random`のfeedを取得する
-2. `quiz_ids`からランダムに1件選ぶ
-3. 対象クイズを取得する
-4. 対象が`published`であることを確認する
-5. 回答に必要な情報だけを返す
+2. `quizzes`からランダムに1件選ぶ
+3. 選択した公開用データを返す
 
 候補が存在しない場合は`404 Not Found`を返す。
 
@@ -391,7 +389,8 @@ Partition key: `quiz_id`
 | `created_at` | String | 作成日時 |
 | `updated_at` | String | 更新日時 |
 
-feed workerは`status-created-at-index`を使用して公開済みクイズを取得する。
+feed workerは`status-created-at-index`を使用して公開済みクイズを作成日時の新しい順に最大10件取得する。
+GSIは`quiz_id`, `question`, `choices`, `difficulty`, `cropped_image_key`をprojectionに含める。
 
 ### 10.3 Quiz Feedテーブル
 
@@ -400,7 +399,15 @@ Partition key: `feed_id`
 ```json
 {
   "feed_id": "random",
-  "quiz_ids": ["quiz_123", "quiz_456"],
+  "quizzes": [
+    {
+      "quiz_id": "quiz_123",
+      "question": "この画像に写っているものは何？",
+      "choices": ["subject_a", "subject_b", "subject_c", "subject_d"],
+      "difficulty": "normal",
+      "cropped_image_key": "quizzes/quiz_123/crop.webp"
+    }
+  ],
   "updated_at": "2026-07-08T00:00:00Z"
 }
 ```
