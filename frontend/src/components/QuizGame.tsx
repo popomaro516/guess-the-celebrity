@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ApiError,
   answerQuiz,
-  getRandomQuiz,
+  getRandomQuizzes,
   type AnswerResult,
   type PublicQuiz,
 } from "../lib/api";
@@ -14,29 +14,33 @@ const difficultyLabels = {
   hard: "むずかしい",
 } as const;
 
+const quizCount = 4;
+
 export default function QuizGame() {
-  const [quiz, setQuiz] = useState<PublicQuiz | null>(null);
+  const [quizzes, setQuizzes] = useState<PublicQuiz[]>([]);
+  const [quizIndex, setQuizIndex] = useState(0);
+  const [score, setScore] = useState(0);
+  const [gameComplete, setGameComplete] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [result, setResult] = useState<AnswerResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const prefetchedQuiz = useRef<Promise<PublicQuiz> | null>(null);
+  const quiz = quizzes[quizIndex] ?? null;
 
-  const loadQuiz = useCallback(async () => {
+  const loadGame = useCallback(async () => {
     setLoading(true);
     setError(null);
     setSelected(null);
     setResult(null);
+    setQuizIndex(0);
+    setScore(0);
+    setGameComplete(false);
 
     try {
-      const nextQuiz = prefetchedQuiz.current
-        ? await prefetchedQuiz.current
-        : await getRandomQuiz();
-      prefetchedQuiz.current = null;
-      setQuiz(nextQuiz);
+      setQuizzes(await getRandomQuizzes(quizCount));
     } catch (caught) {
-      setQuiz(null);
+      setQuizzes([]);
       setError(
         caught instanceof ApiError && caught.status === 404
           ? "公開中のクイズはまだありません。"
@@ -48,8 +52,8 @@ export default function QuizGame() {
   }, []);
 
   useEffect(() => {
-    void loadQuiz();
-  }, [loadQuiz]);
+    void loadGame();
+  }, [loadGame]);
 
   async function submitAnswer() {
     if (!quiz || !selected || submitting) return;
@@ -58,15 +62,24 @@ export default function QuizGame() {
     try {
       const answer = await answerQuiz(quiz.quiz_id, selected);
       setResult(answer);
-      prefetchedQuiz.current = getRandomQuiz();
-      void prefetchedQuiz.current.catch(() => {
-        prefetchedQuiz.current = null;
-      });
+      if (answer.correct) setScore((current) => current + 1);
     } catch {
       setError("回答を送信できませんでした。もう一度お試しください。");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function advanceGame() {
+    if (quizIndex + 1 >= quizzes.length) {
+      setGameComplete(true);
+      setResult(null);
+      return;
+    }
+    setQuizIndex((current) => current + 1);
+    setSelected(null);
+    setResult(null);
+    setError(null);
   }
 
   if (loading) {
@@ -88,10 +101,25 @@ export default function QuizGame() {
           <p className="eyebrow">No quiz found</p>
           <h2>次の一問を準備しています。</h2>
           <p>{error}</p>
-          <button className="button button-primary" type="button" onClick={loadQuiz}>
+          <button className="button button-primary" type="button" onClick={loadGame}>
             もう一度読み込む
           </button>
         </div>
+      </section>
+    );
+  }
+
+  if (gameComplete) {
+    return (
+      <section className="quiz-shell container" aria-live="polite">
+        <article className="game-summary card">
+          <p className="eyebrow">Game complete</p>
+          <h2>{quizzes.length}問中 {score}問正解</h2>
+          <p>{score === quizzes.length ? "全問正解です！" : "遊んでくれてありがとうございました。"}</p>
+          <button className="button button-primary" type="button" onClick={loadGame}>
+            もう一度遊ぶ
+          </button>
+        </article>
       </section>
     );
   }
@@ -121,8 +149,8 @@ export default function QuizGame() {
               </p>
             )}
             <p className="your-answer">あなたの回答：{selected}</p>
-            <button className="button button-primary" type="button" onClick={loadQuiz}>
-              次のクイズへ <span aria-hidden="true">→</span>
+            <button className="button button-primary" type="button" onClick={advanceGame}>
+              {quizIndex + 1 >= quizzes.length ? "結果を見る" : "次のクイズへ"} <span aria-hidden="true">→</span>
             </button>
           </div>
         </article>
@@ -146,7 +174,7 @@ export default function QuizGame() {
         </div>
 
         <div className="quiz-content">
-          <p className="quiz-count">Question</p>
+          <p className="quiz-count">Question {quizIndex + 1} / {quizzes.length}</p>
           <h2>{quiz.question}</h2>
           <div className="answer-grid" role="radiogroup" aria-label="回答の選択肢">
             {quiz.choices.map((choice, index) => (

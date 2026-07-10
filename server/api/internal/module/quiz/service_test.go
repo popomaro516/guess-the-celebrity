@@ -159,30 +159,57 @@ func TestListOwnedReturnsOnlyCreatorsQuizzesNewestFirst(t *testing.T) {
 	}
 }
 
-func TestRandomPublishedReturnsFeedProjectionWithoutLoadingQuiz(t *testing.T) {
+func TestRandomPublishedReturnsUniqueFeedProjectionsWithoutLoadingQuiz(t *testing.T) {
 	repo := newFakeRepository()
 	feed := &fakePublicFeedRepository{
 		quizzes: []quiz.PublicQuiz{
 			{
-				ID:              "quiz_feed",
-				Question:        "feedの問題",
-				CroppedImageKey: "quizzes/quiz_feed/crop.webp",
+				ID:              "quiz_1",
+				Question:        "feedの問題1",
+				CroppedImageKey: "quizzes/quiz_1/crop.webp",
 				Choices:         []string{"A", "B", "C", "D"},
 				Difficulty:      quiz.DifficultyHard,
 			},
+			{ID: "quiz_2", Question: "feedの問題2", Choices: []string{"A", "B", "C", "D"}},
+			{ID: "quiz_3", Question: "feedの問題3", Choices: []string{"A", "B", "C", "D"}},
+			{ID: "quiz_4", Question: "feedの問題4", Choices: []string{"A", "B", "C", "D"}},
+			{ID: "quiz_5", Question: "feedの問題5", Choices: []string{"A", "B", "C", "D"}},
 		},
 	}
 	svc := quiz.NewService(repo, feed, newFakeImageRepository(), &fakeObjectStore{}, &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
 
-	got, err := svc.RandomPublished(context.Background())
+	got, err := svc.RandomPublished(context.Background(), 4)
 	if err != nil {
 		t.Fatalf("RandomPublished returned error: %v", err)
 	}
-	if got.ID != "quiz_feed" || got.Question != "feedの問題" {
-		t.Fatalf("unexpected public quiz: %+v", got)
+	if len(got) != 4 {
+		t.Fatalf("len(RandomPublished) = %d, want 4", len(got))
+	}
+	seen := map[string]bool{}
+	for _, publicQuiz := range got {
+		if seen[publicQuiz.ID] {
+			t.Fatalf("duplicate quiz returned: %s", publicQuiz.ID)
+		}
+		seen[publicQuiz.ID] = true
 	}
 	if repo.findByIDCalls != 0 {
 		t.Fatalf("FindByID calls = %d, want 0", repo.findByIDCalls)
+	}
+}
+
+func TestRandomPublishedReturnsAllCandidatesWhenCountExceedsFeedSize(t *testing.T) {
+	repo := newFakeRepository()
+	feed := &fakePublicFeedRepository{
+		quizzes: []quiz.PublicQuiz{{ID: "quiz_1"}, {ID: "quiz_2"}},
+	}
+	svc := quiz.NewService(repo, feed, newFakeImageRepository(), &fakeObjectStore{}, &fakeCropJobQueue{}, fixedIDs{"quiz_123"}, fixedClock{})
+
+	got, err := svc.RandomPublished(context.Background(), 4)
+	if err != nil {
+		t.Fatalf("RandomPublished returned error: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("len(RandomPublished) = %d, want 2", len(got))
 	}
 }
 

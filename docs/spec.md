@@ -141,8 +141,8 @@ processing -> ready -> published
 APIは次の処理を行う。
 
 1. `feed_id = random`のfeedを取得する
-2. `quizzes`からランダムに1件選ぶ
-3. 選択した公開用データを返す
+2. `quizzes`から重複なしで指定件数をランダムに選ぶ
+3. 選択した公開用データの一覧を返す
 
 候補が存在しない場合は`404 Not Found`を返す。
 
@@ -315,19 +315,25 @@ Response: `204 No Content`
 
 ### 9.9 ランダムクイズ取得
 
-#### `GET /quizzes/random`
+#### `GET /quizzes/random?count=4`
 
 認証: 不要
+
+`count`は1から10まで。省略時は4。公開候補が`count`未満の場合は、存在するクイズをすべて返す。
 
 Response: `200 OK`
 
 ```json
 {
-  "quiz_id": "quiz_123",
-  "question": "この画像に写っているものは何？",
-  "cropped_image_url": "https://...",
-  "choices": ["subject_a", "subject_b", "subject_c", "subject_d"],
-  "difficulty": "normal"
+  "quizzes": [
+    {
+      "quiz_id": "quiz_123",
+      "question": "この画像に写っているものは何？",
+      "cropped_image_url": "https://...",
+      "choices": ["subject_a", "subject_b", "subject_c", "subject_d"],
+      "difficulty": "normal"
+    }
+  ]
 }
 ```
 

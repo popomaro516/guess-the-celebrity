@@ -142,6 +142,62 @@ func TestAnswerRouteRevealsAnswerAndOriginalImageWhenWrong(t *testing.T) {
 	}
 }
 
+func TestRandomQuizRouteReturnsRequestedUniqueQuizCount(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router, quizRepo := newTestRouter(auth.Disabled())
+	for index, id := range []string{"quiz_1", "quiz_2", "quiz_3", "quiz_4", "quiz_5"} {
+		if err := quizRepo.Save(context.Background(), quiz.Quiz{
+			ID:              id,
+			Question:        "これは誰？",
+			Choices:         []string{"A", "B", "C", "D"},
+			Difficulty:      quiz.DifficultyNormal,
+			CroppedImageKey: "quizzes/" + id + "/crop.webp",
+			Status:          quiz.StatusPublished,
+			CreatedAt:       time.Date(2026, 7, index+1, 0, 0, 0, 0, time.UTC),
+		}); err != nil {
+			t.Fatalf("Save returned error: %v", err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/quizzes/random?count=4", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /quizzes/random status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var response struct {
+		Quizzes []struct {
+			ID string `json:"quiz_id"`
+		} `json:"quizzes"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json decode: %v", err)
+	}
+	if len(response.Quizzes) != 4 {
+		t.Fatalf("quiz count = %d, want 4", len(response.Quizzes))
+	}
+	seen := map[string]bool{}
+	for _, publicQuiz := range response.Quizzes {
+		if seen[publicQuiz.ID] {
+			t.Fatalf("duplicate quiz returned: %s", publicQuiz.ID)
+		}
+		seen[publicQuiz.ID] = true
+	}
+}
+
+func TestRandomQuizRouteRejectsInvalidCount(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := testRouter()
+	req := httptest.NewRequest(http.MethodGet, "/quizzes/random?count=11", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("GET /quizzes/random status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
 func TestHealthRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := testRouter()
