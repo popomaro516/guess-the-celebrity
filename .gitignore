@@ -119,6 +119,8 @@ dist
 # Project planning docs are local-only except for the product specification.
 docs/*
 !docs/spec.md
+!docs/assets/
+!docs/assets/architecture-overview.jpg
 
 # Firebase cache directory
 .firebase/
