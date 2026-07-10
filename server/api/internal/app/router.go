@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -136,22 +137,36 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	})
 
 	router.GET("/quizzes/random", func(c *gin.Context) {
-		out, err := deps.QuizService.RandomPublished(c.Request.Context())
+		count := 4
+		if rawCount := c.Query("count"); rawCount != "" {
+			parsedCount, err := strconv.Atoi(rawCount)
+			if err != nil || parsedCount < 1 || parsedCount > 10 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "count must be between 1 and 10"})
+				return
+			}
+			count = parsedCount
+		}
+
+		out, err := deps.QuizService.RandomPublished(c.Request.Context(), count)
 		if err != nil {
 			respondError(c, logger, err)
 			return
 		}
-		logEvent(c, logger, slog.LevelInfo, "random quiz served",
-			slog.String("quiz_id", out.ID),
-			slog.String("difficulty", string(out.Difficulty)),
+		response := make([]gin.H, 0, len(out))
+		for _, publicQuiz := range out {
+			response = append(response, gin.H{
+				"quiz_id":           publicQuiz.ID,
+				"question":          publicQuiz.Question,
+				"cropped_image_url": assetURL(deps.AssetBaseURL, publicQuiz.CroppedImageKey),
+				"choices":           publicQuiz.Choices,
+				"difficulty":        publicQuiz.Difficulty,
+			})
+		}
+		logEvent(c, logger, slog.LevelInfo, "random quizzes served",
+			slog.Int("requested_quiz_count", count),
+			slog.Int("quiz_count", len(out)),
 		)
-		c.JSON(http.StatusOK, gin.H{
-			"quiz_id":           out.ID,
-			"question":          out.Question,
-			"cropped_image_url": assetURL(deps.AssetBaseURL, out.CroppedImageKey),
-			"choices":           out.Choices,
-			"difficulty":        out.Difficulty,
-		})
+		c.JSON(http.StatusOK, gin.H{"quizzes": response})
 	})
 
 	router.GET("/quizzes/mine", deps.AuthMiddleware, func(c *gin.Context) {

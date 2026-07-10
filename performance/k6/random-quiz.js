@@ -62,10 +62,15 @@ export default function () {
         try {
           const body = result.json();
           return (
-            typeof body.quiz_id === "string" &&
-            typeof body.question === "string" &&
-            Array.isArray(body.choices) &&
-            body.choices.length === 4
+            Array.isArray(body.quizzes) &&
+            body.quizzes.length > 0 &&
+            body.quizzes.every(
+              (quiz) =>
+                typeof quiz.quiz_id === "string" &&
+                typeof quiz.question === "string" &&
+                Array.isArray(quiz.choices) &&
+                quiz.choices.length === 4,
+            )
           );
         } catch {
           return false;

@@ -87,8 +87,9 @@ async function request<T>(
   return response.json() as Promise<T>;
 }
 
-export function getRandomQuiz(): Promise<PublicQuiz> {
-  return request<PublicQuiz>("/quizzes/random");
+export async function getRandomQuizzes(count = 4): Promise<PublicQuiz[]> {
+  const response = await request<{ quizzes: PublicQuiz[] }>(`/quizzes/random?count=${count}`);
+  return response.quizzes;
 }
 
 export function answerQuiz(quizId: string, answer: string): Promise<AnswerResult> {

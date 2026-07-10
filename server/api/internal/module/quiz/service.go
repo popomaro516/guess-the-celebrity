@@ -184,22 +184,29 @@ func (s *Service) Delete(ctx context.Context, creatorUserID, quizID string) erro
 	return nil
 }
 
-func (s *Service) RandomPublished(ctx context.Context) (PublicQuiz, error) {
+func (s *Service) RandomPublished(ctx context.Context, count int) ([]PublicQuiz, error) {
 	quizzes, err := s.publicFeed.FindPublicQuizCandidates(ctx, 10)
 	if err != nil {
-		return PublicQuiz{}, err
+		return nil, err
 	}
 	if len(quizzes) == 0 {
-		return PublicQuiz{}, ErrQuizNotFound
+		return nil, ErrQuizNotFound
+	}
+	if count > len(quizzes) {
+		count = len(quizzes)
 	}
 
-	index, err := randomIndex(len(quizzes))
-	if err != nil {
-		return PublicQuiz{}, err
+	selected := append([]PublicQuiz(nil), quizzes...)
+	for index := 0; index < count; index++ {
+		offset, err := randomIndex(len(selected) - index)
+		if err != nil {
+			return nil, err
+		}
+		swapIndex := index + offset
+		selected[index], selected[swapIndex] = selected[swapIndex], selected[index]
+		selected[index].Choices = append([]string(nil), selected[index].Choices...)
 	}
-	selected := quizzes[index]
-	selected.Choices = append([]string(nil), selected.Choices...)
-	return selected, nil
+	return selected[:count], nil
 }
 
 func validCrop(c Crop) bool {
