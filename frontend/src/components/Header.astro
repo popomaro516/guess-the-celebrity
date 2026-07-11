@@ -1,26 +1,8 @@
----
-const path = Astro.url.pathname;
----
-
 <header class="site-header">
   <nav class="nav container" aria-label="メインナビゲーション">
     <a class="wordmark" href="/" aria-label="Guess the Celebrity ホーム">
       Guess the Celebrity
     </a>
-    <div class="nav-links">
-      <a class:list={["nav-link", { active: path === "/play/" }]} href="/play/">クイズに回答</a>
-      <a class:list={["nav-link", { active: path === "/create/" }]} href="/create/">クイズを作成</a>
-      <a class="button button-outline button-small" href="/account/">アカウント</a>
-    </div>
-    <details class="mobile-menu">
-      <summary aria-label="メニューを開く">
-        <span></span><span></span><span></span>
-      </summary>
-      <div class="mobile-menu-panel">
-        <a href="/play/">クイズに回答</a>
-        <a href="/create/">クイズを作成</a>
-        <a href="/account/">アカウント</a>
-      </div>
-    </details>
+    <a class="button button-outline button-small" href="/account/">アカウント</a>
   </nav>
 </header>
