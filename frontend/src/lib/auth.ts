@@ -68,7 +68,7 @@ export function authErrorMessage(error: unknown): string {
     CodeMismatchException: "確認コードが正しくありません。",
     ExpiredCodeException: "確認コードの有効期限が切れています。再送してください。",
     LimitExceededException: "試行回数が上限に達しました。時間をおいてお試しください。",
-    InvalidPasswordException: "パスワードが要件を満たしていません。",
+    InvalidPasswordException: "パスワードは8文字以上で、英大文字・英小文字・数字・記号をそれぞれ1文字以上含めてください。",
     UserNotConfirmedException: "メールアドレスの確認が完了していません。",
   };
 

@@ -20,6 +20,14 @@ interface Props {
   mode: Mode;
 }
 
+const passwordRequirements = [
+  { label: "8文字以上", test: (value: string) => value.length >= 8 },
+  { label: "英大文字を1文字以上", test: (value: string) => /[A-Z]/.test(value) },
+  { label: "英小文字を1文字以上", test: (value: string) => /[a-z]/.test(value) },
+  { label: "数字を1文字以上", test: (value: string) => /[0-9]/.test(value) },
+  { label: "記号を1文字以上", test: (value: string) => /[^A-Za-z0-9]/.test(value) },
+] as const;
+
 const content = {
   login: {
     eyebrow: "Welcome back",
@@ -88,6 +96,14 @@ export default function AuthForm({ mode }: Props) {
         password !== passwordConfirmation) {
       setError("パスワードが一致しません。");
       return;
+    }
+
+    if (mode === "signup" || (mode === "forgot" && forgotStep === "confirm")) {
+      const unmetRequirements = passwordRequirements.filter(({ test }) => !test(password));
+      if (unmetRequirements.length > 0) {
+        setError(`パスワードには「${unmetRequirements.map(({ label }) => label).join("・")}」が必要です。`);
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -231,7 +247,20 @@ export default function AuthForm({ mode }: Props) {
                 onChange={(event) => setPassword(event.target.value)}
               />
               {mode !== "login" && (
-                <p className="field-help">8文字以上。実際の要件はCognitoの設定に従います。</p>
+                <div className="password-requirements" aria-label="パスワードの要件">
+                  <p>次のすべてを含めてください。</p>
+                  <ul>
+                    {passwordRequirements.map(({ label, test }) => {
+                      const isMet = test(password);
+                      return (
+                        <li className={isMet ? "is-met" : undefined} key={label}>
+                          <span aria-hidden="true">{isMet ? "✓" : "○"}</span>
+                          {label}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               )}
             </div>
           )}
