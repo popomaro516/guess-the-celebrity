@@ -1,0 +1,4 @@
+interface:
+  display_name: "Go Context"
+  short_description: "Propagate cancellation and deadlines correctly"
+  default_prompt: "Use $golang-context to review context propagation in this Go flow."

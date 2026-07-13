@@ -1,0 +1,4 @@
+interface:
+  display_name: "Go Error Handling"
+  short_description: "Design and review idiomatic Go error flows"
+  default_prompt: "Use $golang-error-handling to review and improve this Go error path."
