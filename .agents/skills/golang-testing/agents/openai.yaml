@@ -1,0 +1,4 @@
+interface:
+  display_name: "Go Testing"
+  short_description: "Write and review reliable Go 1.22 tests"
+  default_prompt: "Use $golang-testing to add focused tests for this Go change."
